@@ -14,6 +14,7 @@ from sqlalchemy import update, text
 from decimal import Decimal
 import asyncio
 import json
+import os
 from arq import create_pool
 from arq.connections import RedisSettings
 
@@ -26,7 +27,9 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "http://localhost:3001",
-        "https://eggclick.vercel.app"
+        "https://eggclick.vercel.app",
+        "https://eggclick-production.up.railway.app",
+        os.getenv("FRONTEND_URL", "https://eggclick.vercel.app")
     ],
     allow_credentials=True,
     allow_methods=["*"],
