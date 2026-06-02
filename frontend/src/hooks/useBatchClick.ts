@@ -2,6 +2,8 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { getDeviceFingerprint } from "../lib/fingerprint";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
 export function useBatchClick(
   flushInterval: number = 2000,
   onUpdate?: (coins: number, inventory?: any) => void,
@@ -344,7 +346,7 @@ export function useBatchClick(
 
         localStorage.setItem(`pending_egg_batch_${userId}`, data);
         if (cachedToken.current) {
-          fetch("http://localhost:8000/api/v1/clicks/", {
+          fetch(`${API_URL}/api/v1/clicks/`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -355,7 +357,7 @@ export function useBatchClick(
           }).catch(() => { });
         } else {
           navigator.sendBeacon(
-            "http://localhost:8000/api/v1/clicks/beacon",
+            `${API_URL}/api/v1/clicks/beacon`,
             new Blob([data], { type: "text/plain" }),
           );
         }
@@ -438,7 +440,7 @@ export function useBatchClick(
           bypassTokenPending.current = null;
         } else {
           // Fallback HTTP si WS está cerrado o no disponible
-          fetch("http://localhost:8000/api/v1/clicks/", {
+          fetch(`${API_URL}/api/v1/clicks/`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",

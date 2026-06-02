@@ -10,7 +10,7 @@ import EggTemperaturePanel from '@/components/game/EggTemperaturePanel';
 import FloatingNotifications, { NotificationItem } from '@/components/game/FloatingNotifications';
 import { useBatchClick } from '@/hooks/useBatchClick';
 import { CountryCode } from '@/lib/currency';
-import { ShoppingBag, Trophy, Loader2, WifiOff, Gift, X, Shield, Gamepad2, Settings, LogOut } from 'lucide-react';
+import { ShoppingBag, Trophy, Loader2, WifiOff, Gift, X, Shield, Gamepad2, Settings, LogOut, User } from 'lucide-react';
 import { DailySpinModal } from '@/components/game/DailySpinModal';
 
 import { getRankInfo } from '@/lib/ranking';
@@ -26,6 +26,7 @@ import { TutorialModal } from '@/components/ui/TutorialModal';
 import { VideoAdModal } from '@/components/ads/VideoAdModal';
 import Link from 'next/link';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const WS_URL = API_URL.replace(/^http/, 'ws');
 
 export default function GamePage() {
   const { data: session, status } = useSession();
@@ -284,7 +285,7 @@ export default function GamePage() {
     let reconnectTimeout: NodeJS.Timeout;
 
     const connectWS = () => {
-      ws = new WebSocket('ws://localhost:8000/ws/game');
+      ws = new WebSocket(`${WS_URL}/ws/game`);
 
       ws.onopen = () => {
         setIsWsConnected(true);
@@ -352,7 +353,7 @@ export default function GamePage() {
         userReconnectTimeout = setTimeout(connectUserWS, 1000);
         return;
       }
-      const ws = new WebSocket(`ws://localhost:8000/ws/user/${session?.user?.email}?token=${cachedToken.current}`);
+      const ws = new WebSocket(`${WS_URL}/ws/user/${session?.user?.email}?token=${cachedToken.current}`);
       userWsRef.current = ws;
 
       ws.onmessage = (event) => {
@@ -1217,17 +1218,37 @@ export default function GamePage() {
 
         <div className="w-6 h-px bg-slate-800"></div>
 
-        {/* Perfil */}
-        <button onClick={() => { setEditUsername(username); setNameSuggestions([]); setShowProfileModal(true); }} className="flex flex-col items-center gap-1 active:scale-95 transition-transform p-1">
-          <Settings className="w-6 h-6 text-slate-300 drop-shadow-md" />
-        </button>
+        {status === 'authenticated' ? (
+          <>
+            {/* Perfil */}
+            <button onClick={() => { setEditUsername(username); setNameSuggestions([]); setShowProfileModal(true); }} className="flex flex-col items-center gap-1 active:scale-95 transition-transform p-1">
+              <Settings className="w-6 h-6 text-slate-300 drop-shadow-md" />
+            </button>
 
-        <div className="w-6 h-px bg-slate-800"></div>
+            <div className="w-6 h-px bg-slate-800"></div>
 
-        {/* Salir */}
-        <button onClick={() => signOut()} className="flex flex-col items-center gap-1 active:scale-95 transition-transform text-red-500/80 hover:text-red-400 p-1">
-          <LogOut className="w-6 h-6 drop-shadow-md" />
-        </button>
+            {/* Salir */}
+            <button onClick={() => signOut()} className="flex flex-col items-center gap-1 active:scale-95 transition-transform text-red-500/80 hover:text-red-400 p-1">
+              <LogOut className="w-6 h-6 drop-shadow-md" />
+            </button>
+          </>
+        ) : (
+          /* Iniciar Sesión */
+          <button
+            onClick={() => {
+              setIsLoggingIn(true);
+              signIn('google');
+            }}
+            disabled={isLoggingIn}
+            className="flex flex-col items-center gap-1 active:scale-95 transition-transform p-1 disabled:opacity-70 disabled:cursor-wait"
+          >
+            {isLoggingIn ? (
+              <Loader2 className="w-6 h-6 text-blue-400 animate-spin" />
+            ) : (
+              <User className="w-6 h-6 text-blue-400 drop-shadow-[0_0_8px_rgba(96,165,250,0.8)]" />
+            )}
+          </button>
+        )}
       </div>
 
       {/* Footer para enlaces legales de AdSense */}

@@ -4,6 +4,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2, Check, X } from 'lucide-react';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
 interface DailySpinModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -152,7 +154,7 @@ export const DailySpinModal: React.FC<DailySpinModalProps> = ({
     setDisplaySuperSpinUsed(true);
 
     try {
-      const res = await fetch(`http://localhost:8000/api/v1/game/user/${userId}/daily-spin`, {
+      const res = await fetch(`${API_URL}/api/v1/game/user/${userId}/daily-spin`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -198,7 +200,7 @@ export const DailySpinModal: React.FC<DailySpinModalProps> = ({
     setPurchaseStatus('buying');
     setError(null);
     try {
-      const res = await fetch(`http://localhost:8000/api/v1/game/user/${userId}/buy-spins`, {
+      const res = await fetch(`${API_URL}/api/v1/game/user/${userId}/buy-spins`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

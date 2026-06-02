@@ -5,6 +5,8 @@ import { X, Trophy, Users, User as UserIcon } from 'lucide-react';
 import Image from 'next/image';
 import { getRankInfo } from '@/lib/ranking';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
 interface LeaderboardPanelProps {
     isOpen: boolean;
     onClose: () => void;
@@ -20,8 +22,8 @@ export default memo(function LeaderboardPanel({ isOpen, onClose }: LeaderboardPa
         if (isOpen) {
             setLoading(true);
             Promise.all([
-                fetch('http://localhost:8000/api/v1/leaderboard/users').then(res => res.json()),
-                fetch('http://localhost:8000/api/v1/leaderboard/clans').then(res => res.json())
+                fetch(`${API_URL}/api/v1/leaderboard/users`).then(res => res.json()),
+                fetch(`${API_URL}/api/v1/leaderboard/clans`).then(res => res.json())
             ])
             .then(([usersData, clansData]) => {
                 setUsers(usersData);

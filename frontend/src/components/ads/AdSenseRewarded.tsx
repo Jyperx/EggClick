@@ -1,5 +1,7 @@
 import { useState } from 'react';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
 interface AdSenseRewardedProps {
     onRewardEarned: (token?: string) => void;
 }
@@ -10,7 +12,7 @@ export default function AdSenseRewarded({ onRewardEarned }: AdSenseRewardedProps
     const showRewardedVideo = async () => {
         setIsPlaying(true);
         try {
-            const res = await fetch('http://localhost:8000/api/v1/ads/generate-token');
+            const res = await fetch(`${API_URL}/api/v1/ads/generate-token`);
             const data = await res.json();
             
             // Simulamos un anuncio de 5 segundos

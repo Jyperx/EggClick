@@ -7,6 +7,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useSession } from 'next-auth/react';
 import Image from 'next/image';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
 interface Props {
     item: ShopItemType;
     userCountry: CountryCode;
@@ -40,7 +42,7 @@ export default function ShopItemCard({ item, userCountry, eggCoins }: Props) {
             const tokenRes = await fetch('/api/auth/token');
             const { token } = await tokenRes.json();
 
-            const res = await fetch(`http://localhost:8000/api/v1/shop/buy/${item.id}`, {
+            const res = await fetch(`${API_URL}/api/v1/shop/buy/${item.id}`, {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
