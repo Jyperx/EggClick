@@ -26,11 +26,9 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
-        "http://localhost:3001",
-        "https://eggclick.vercel.app",
-        "https://eggclick-production.up.railway.app",
-        os.getenv("FRONTEND_URL", "https://eggclick.vercel.app")
+        "https://eggclick.vercel.app"
     ],
+    allow_origin_regex=r"https://.*\.vercel\.app", # <--- EL COMODÍN MÁGICO: Acepta cualquier subdominio de Vercel
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
