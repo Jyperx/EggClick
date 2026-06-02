@@ -25,6 +25,7 @@ import { CookieBanner } from '@/components/ui/CookieBanner';
 import { TutorialModal } from '@/components/ui/TutorialModal';
 import { VideoAdModal } from '@/components/ads/VideoAdModal';
 import Link from 'next/link';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export default function GamePage() {
   const { data: session, status } = useSession();
@@ -67,7 +68,7 @@ export default function GamePage() {
   const handleAdComplete = async () => {
     setShowAdModal(false);
     try {
-      const res = await fetch('http://localhost:8000/api/v1/clicks/skip_cooldown_ad', {
+      const res = await fetch(`${API_URL}/api/v1/clicks/skip_cooldown_ad`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${cachedToken.current}`,
@@ -181,7 +182,7 @@ export default function GamePage() {
       if (pendingBatchStr) {
         try {
           // Await garantiza que el backend actualice su DB ANTES de que hagamos el GET de estado.
-          await fetch('http://localhost:8000/api/v1/clicks/', {
+          await fetch(`${API_URL}/api/v1/clicks/`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: pendingBatchStr
@@ -198,7 +199,7 @@ export default function GamePage() {
         } catch (e) { }
       }
 
-      fetch(`http://localhost:8000/api/v1/game/user/${session?.user?.email}?t=${Date.now()}`, { cache: 'no-store' })
+      fetch(`${API_URL}/api/v1/game/user/${session?.user?.email}?t=${Date.now()}`, { cache: 'no-store' })
         .then(res => res.json())
         .then(data => {
           if (data) {
@@ -235,7 +236,7 @@ export default function GamePage() {
 
   useEffect(() => {
     const fetchGameState = () => {
-      fetch(`http://localhost:8000/api/v1/game/state?t=${Date.now()}`, { cache: 'no-store' })
+      fetch(`${API_URL}/api/v1/game/state?t=${Date.now()}`, { cache: 'no-store' })
         .then(res => res.json())
         .then(data => {
           if (data && typeof data.current_clicks === 'number') {
@@ -926,7 +927,7 @@ export default function GamePage() {
                 <button
                   onClick={async () => {
                     if (!session?.user?.email || !editUsername.trim()) return;
-                    const res = await fetch(`http://localhost:8000/api/v1/game/user/${session.user.email}/profile`, {
+                    const res = await fetch(`${API_URL}/api/v1/game/user/${session.user.email}/profile`, {
                       method: 'PUT',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ country: userCountry, username: editUsername.trim() })
@@ -1028,7 +1029,7 @@ export default function GamePage() {
                   <button
                     onClick={async () => {
                       if (!session?.user?.email || !editUsername.trim()) return;
-                      const res = await fetch(`http://localhost:8000/api/v1/game/user/${session.user.email}/profile`, {
+                      const res = await fetch(`${API_URL}/api/v1/game/user/${session.user.email}/profile`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ country: userCountry, username: editUsername.trim() })

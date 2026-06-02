@@ -17,12 +17,17 @@ import json
 from arq import create_pool
 from arq.connections import RedisSettings
 
+
 app = FastAPI(title="Egg Clicker API")
 
 # CORS para permitir peticiones desde Next.js
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "https://eggclick.vercel.app"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
