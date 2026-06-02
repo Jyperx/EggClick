@@ -851,22 +851,22 @@ export default function GamePage() {
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.9, opacity: 0 }}
                 transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                className="bg-slate-900 border border-slate-700 p-6 md:p-8 rounded-3xl shadow-[0_0_50px_rgba(236,72,153,0.1)] max-w-md w-full text-center flex flex-col max-h-[90vh]"
+                className="bg-slate-900 border border-slate-700 p-4 sm:p-6 md:p-8 rounded-2xl sm:rounded-3xl shadow-[0_0_50px_rgba(236,72,153,0.1)] max-w-md w-full text-center flex flex-col max-h-[85vh] sm:max-h-[90vh]"
               >
-                <h2 className="text-2xl font-black text-white uppercase tracking-widest mb-2">¡Bienvenido a Egg!</h2>
-                <p className="text-slate-400 text-sm mb-6">Configura tu perfil para empezar a jugar.</p>
+                <h2 className="text-lg sm:text-2xl font-black text-white uppercase tracking-widest mb-1 sm:mb-2">¡Bienvenido a Egg!</h2>
+                <p className="text-slate-400 text-xs sm:text-sm mb-3 sm:mb-6">Configura tu perfil para empezar a jugar.</p>
 
-                <div className="mb-4 text-left">
-                  <label className="block text-white/70 text-sm font-bold mb-2">Tu Nombre de Usuario</label>
+                <div className="mb-3 sm:mb-4 text-left flex-shrink-0">
+                  <label className="block text-white/70 text-xs sm:text-sm font-bold mb-1.5 sm:mb-2">Tu Nombre de Usuario</label>
                   <input
                     type="text"
                     maxLength={15}
                     value={editUsername}
                     onChange={e => { setEditUsername(e.target.value); setNameSuggestions([]); }}
-                    className="w-full bg-black/40 border border-white/20 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-pink-500 font-bold"
+                    className="w-full bg-black/40 border border-white/20 rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 text-white focus:outline-none focus:border-pink-500 font-bold text-sm sm:text-base"
                   />
                   {nameSuggestions.length > 0 && (
-                    <div className="mt-3">
+                    <div className="mt-2 sm:mt-3">
                       <p className="text-red-400 text-xs font-bold mb-2">❌ Este nombre ya está en uso. ¿Qué tal estos?</p>
                       <div className="flex flex-wrap gap-2">
                         {nameSuggestions.map(s => (
@@ -883,8 +883,8 @@ export default function GamePage() {
                   )}
                 </div>
 
-                <label className="block text-white/70 text-sm font-bold mb-2 text-left mt-2">Moneda de la Tienda (País)</label>
-                <div className="flex-1 overflow-y-auto mb-6 bg-slate-950/50 rounded-xl border border-slate-700 text-left custom-scrollbar scroll-smooth">
+                <label className="block text-white/70 text-xs sm:text-sm font-bold mb-1.5 sm:mb-2 text-left flex-shrink-0">Moneda de la Tienda (País)</label>
+                <div className="flex-1 min-h-0 overflow-y-auto mb-3 sm:mb-6 bg-slate-950/50 rounded-xl border border-slate-700 text-left custom-scrollbar scroll-smooth">
                   {[
                     { code: 'US', name: 'Estados Unidos', curr: 'USD' },
                     { code: 'CO', name: 'Colombia', curr: 'COP' },
@@ -915,10 +915,10 @@ export default function GamePage() {
                     <button
                       key={c.code}
                       onClick={() => setUserCountry(c.code as CountryCode)}
-                      className={`w-full flex items-center justify-between p-4 border-b border-slate-800/50 last:border-0 transition-colors ${userCountry === c.code ? 'bg-pink-500/20 text-pink-400' : 'text-slate-300 hover:bg-slate-800'}`}
+                      className={`w-full flex items-center justify-between px-3 sm:px-4 py-2.5 sm:py-3 border-b border-slate-800/50 last:border-0 transition-colors text-sm ${userCountry === c.code ? 'bg-pink-500/20 text-pink-400' : 'text-slate-300 hover:bg-slate-800'}`}
                     >
                       <span className="font-bold">{c.name}</span>
-                      <span className={`text-xs font-black tracking-widest px-2 py-1 rounded-md ${userCountry === c.code ? 'bg-pink-500/30' : 'bg-slate-800 text-slate-500'}`}>
+                      <span className={`text-[10px] sm:text-xs font-black tracking-widest px-2 py-0.5 sm:py-1 rounded-md ${userCountry === c.code ? 'bg-pink-500/30' : 'bg-slate-800 text-slate-500'}`}>
                         {c.curr}
                       </span>
                     </button>
@@ -938,6 +938,7 @@ export default function GamePage() {
                       setUsername(editUsername.trim());
                       setNameSuggestions([]);
                       setShowCountryModal(false);
+                      reloadUser();
                     } else {
                       if (data.suggestions) {
                         setNameSuggestions(data.suggestions);
@@ -946,7 +947,7 @@ export default function GamePage() {
                       }
                     }
                   }}
-                  className="w-full mt-auto bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white py-4 rounded-xl font-black uppercase tracking-widest shadow-[0_0_20px_rgba(236,72,153,0.4)] transition-all active:scale-95 flex-shrink-0"
+                  className="w-full flex-shrink-0 bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white py-3 sm:py-4 rounded-xl font-black uppercase tracking-widest text-sm shadow-[0_0_20px_rgba(236,72,153,0.4)] transition-all active:scale-95"
                 >
                   Comenzar a Jugar
                 </button>

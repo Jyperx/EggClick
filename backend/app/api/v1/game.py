@@ -201,21 +201,33 @@ class ProfileUpdate(BaseModel):
 async def update_user_profile(user_id: str, data: ProfileUpdate, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalars().first()
-    if user:
+    if not user:
+        # Auto-create user on first profile setup (new account)
+        default_username = data.username or user_id.split('@')[0]
+        user = User(
+            id=user_id,
+            username=default_username,
+            total_clicks=0,
+            egg_coins=0,
+            country=data.country,
+            inventory={}
+        )
+        db.add(user)
+    else:
         user.country = data.country
-        if data.username:
-            # Check if username exists (excluding self)
-            existing = await db.execute(select(User).where(User.username == data.username, User.id != user_id))
-            if existing.scalars().first():
-                # Get all taken usernames to avoid suggesting them
-                all_users = await db.execute(select(User.username))
-                taken = set(u for u in all_users.scalars().all() if u)
-                suggestions = generate_suggestions(data.username, taken)
-                return {"status": "error", "message": "Username already taken", "suggestions": suggestions}
-            user.username = data.username
-        await db.commit()
-        return {"status": "success", "country": user.country, "username": user.username}
-    return {"status": "error", "message": "User not found"}
+
+    if data.username:
+        # Check if username exists (excluding self)
+        existing = await db.execute(select(User).where(User.username == data.username, User.id != user_id))
+        if existing.scalars().first():
+            # Get all taken usernames to avoid suggesting them
+            all_users = await db.execute(select(User.username))
+            taken = set(u for u in all_users.scalars().all() if u)
+            suggestions = generate_suggestions(data.username, taken)
+            return {"status": "error", "message": "Username already taken", "suggestions": suggestions}
+        user.username = data.username
+    await db.commit()
+    return {"status": "success", "country": user.country, "username": user.username}
 
 def _sync_spin_state(inv, current_date_str):
     if inv.get("spin_tracker_date") != current_date_str:
