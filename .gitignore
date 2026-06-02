@@ -1,0 +1,50 @@
+# Python / Backend
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+venv/
+.venv/
+env/
+.env
+*.db
+*.sqlite3
+*.log
+
+# Node / Frontend
+node_modules/
+.next/
+out/
+frontend/.env
+frontend/.env.local
+frontend/.env.production
+
+# General
+.DS_Store
+Thumbs.db
+*.bak
+
+# Archivos de admin / debug (solo locales)
+backend/fix_*.py
+backend/add_*.py
+backend/check_*.py
+backend/reset*.py
+backend/give_coins.py
+backend/monitor.py
+backend/admin_console.py
+backend/sim_shop.py
+backend/get_colors.py
+backend/rewrite_*.py
+backend/clicks_debug.log
+backend/egg.db
+backend/egg_game.db
+backend/client_secret_*.json
+backend/registraduria*.png
+backend/unban.py
+backend/update_clan.py
