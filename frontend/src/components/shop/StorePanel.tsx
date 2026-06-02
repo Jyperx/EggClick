@@ -5,6 +5,7 @@ import { CountryCode } from '@/lib/currency';
 import { X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export interface ShopItemType {
     id: number;
@@ -26,7 +27,7 @@ export default memo(function StorePanel({ isOpen, onClose, userCountry, eggCoins
 
     useEffect(() => {
         // Prefetch items en segundo plano al montar el componente
-        fetch('http://localhost:8000/api/v1/shop/items', { cache: 'no-store' })
+        fetch(`${API_URL}/api/v1/shop/items`, { cache: 'no-store' })
             .then(res => res.json())
             .then(data => setItems(data))
             .catch(err => console.error("Error cargando la tienda:", err));
@@ -37,16 +38,16 @@ export default memo(function StorePanel({ isOpen, onClose, userCountry, eggCoins
             {isOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                     {/* Backdrop */}
-                    <motion.div 
+                    <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={onClose}
                         className="absolute inset-0 bg-slate-950/95"
                     />
-                    
+
                     {/* Modal */}
-                    <motion.div 
+                    <motion.div
                         initial={{ scale: 0.9, opacity: 0, y: 20 }}
                         animate={{ scale: 1, opacity: 1, y: 0 }}
                         exit={{ scale: 0.9, opacity: 0, y: 20 }}
@@ -57,7 +58,7 @@ export default memo(function StorePanel({ isOpen, onClose, userCountry, eggCoins
                         <div className="p-6 border-b border-white/10 bg-black/20 flex justify-between items-center relative overflow-hidden">
                             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500"></div>
                             <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-purple-400 uppercase tracking-widest drop-shadow-sm">Black Market</h2>
-                            
+
                             <div className="flex items-center gap-6">
                                 <div className="hidden md:flex items-center gap-3 bg-slate-950 px-4 py-2 rounded-xl border border-yellow-500/20 shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)]">
                                     <span className="text-[10px] font-black text-slate-400 tracking-[0.2em] uppercase">Saldo</span>

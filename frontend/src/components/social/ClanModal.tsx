@@ -5,6 +5,7 @@ import { X } from 'lucide-react';
 import Image from 'next/image';
 import { getRankInfo } from '@/lib/ranking';
 import { getClanTheme } from '@/lib/clanThemes';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 interface Clan {
   id: number;
@@ -25,15 +26,15 @@ interface ClanRequest {
   username: string;
 }
 
-export default function ClanModal({ 
-  isOpen, 
-  onClose, 
-  userId, 
+export default function ClanModal({
+  isOpen,
+  onClose,
+  userId,
   userClanId,
   userEggCoins,
   onClanJoined
-}: { 
-  isOpen: boolean; 
+}: {
+  isOpen: boolean;
   onClose: () => void;
   userId: string;
   userClanId: number | null;
@@ -87,16 +88,16 @@ export default function ClanModal({
 
   const sortedClans = React.useMemo(() => {
     return [...clans].sort((a, b) => {
-       if (a.id === pendingClanId) return -1;
-       if (b.id === pendingClanId) return 1;
-       return b.member_count - a.member_count;
+      if (a.id === pendingClanId) return -1;
+      if (b.id === pendingClanId) return 1;
+      return b.member_count - a.member_count;
     });
   }, [clans, pendingClanId]);
 
   const fetchMyClan = async () => {
     if (!userClanId) return;
     try {
-      const res = await fetchWithToken(`http://localhost:8000/api/v1/clans/${userClanId}`);
+      const res = await fetchWithToken(`${API_URL}/api/v1/clans/${userClanId}`);
       if (res.ok) {
         const data = await res.json();
         setMyClan(data);
@@ -112,7 +113,7 @@ export default function ClanModal({
 
   const fetchAllClans = async () => {
     try {
-      const res = await fetch(`http://localhost:8000/api/v1/clans/`);
+      const res = await fetch(`${API_URL}/api/v1/clans/`);
       if (res.ok) {
         setClans(await res.json());
       }
@@ -123,7 +124,7 @@ export default function ClanModal({
 
   const fetchRequests = async (clanId: number) => {
     try {
-      const res = await fetchWithToken(`http://localhost:8000/api/v1/clans/${clanId}/requests`);
+      const res = await fetchWithToken(`${API_URL}/api/v1/clans/${clanId}/requests`);
       if (res.ok) {
         setRequests(await res.json());
       }
@@ -141,7 +142,7 @@ export default function ClanModal({
     }
     setLoading(true);
     try {
-      const res = await fetchWithToken(`http://localhost:8000/api/v1/clans/create`, {
+      const res = await fetchWithToken(`${API_URL}/api/v1/clans/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -172,7 +173,7 @@ export default function ClanModal({
     }
     setLoading(true);
     try {
-      const res = await fetchWithToken(`http://localhost:8000/api/v1/clans/${clanId}/join`, {
+      const res = await fetchWithToken(`${API_URL}/api/v1/clans/${clanId}/join`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({})
@@ -193,7 +194,7 @@ export default function ClanModal({
   const handleProcessRequest = async (reqId: number, action: 'accept' | 'reject') => {
     setLoading(true);
     try {
-      const res = await fetchWithToken(`http://localhost:8000/api/v1/clans/${userClanId}/${action}/${reqId}`, {
+      const res = await fetchWithToken(`${API_URL}/api/v1/clans/${userClanId}/${action}/${reqId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({})
@@ -229,7 +230,7 @@ export default function ClanModal({
         </div>
 
         <div className="flex border-b border-white/10">
-          <button 
+          <button
             className={`flex-1 p-3 text-center font-medium transition-colors ${activeTab === 'my_clan' ? 'bg-orange-500/20 text-orange-400 border-b-2 border-orange-500' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
             onClick={() => { setActiveTab('my_clan'); fetchMyClan(); }}
           >
@@ -237,13 +238,13 @@ export default function ClanModal({
           </button>
           {!userClanId && (
             <>
-              <button 
+              <button
                 className={`flex-1 p-3 text-center font-medium transition-colors ${activeTab === 'search' ? 'bg-orange-500/20 text-orange-400 border-b-2 border-orange-500' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
                 onClick={() => { setActiveTab('search'); fetchAllClans(); }}
               >
                 Buscar Clan
               </button>
-              <button 
+              <button
                 className={`flex-1 p-3 text-center font-medium transition-colors ${activeTab === 'create' ? 'bg-orange-500/20 text-orange-400 border-b-2 border-orange-500' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
                 onClick={() => setActiveTab('create')}
               >
@@ -284,8 +285,8 @@ export default function ClanModal({
                       <h3 className={`text-3xl font-black ${getClanTheme(myClan.shield_id).text} ${getClanTheme(myClan.shield_id).textGlow}`}>{myClan.name}</h3>
                       {myClan.description && <p className="text-white/50 text-sm max-w-sm">{myClan.description}</p>}
                       <div className={`flex items-center gap-1.5 bg-slate-950/80 border px-3 py-1.5 rounded-full mt-2 ${getClanTheme(myClan.shield_id).border} ${getClanTheme(myClan.shield_id).boxGlow}`}>
-                         <Image src={`/sprites/ranked/${getRankInfo(myClan.total_clicks).id}.png`} alt="Clan Rank" width={20} height={20} unoptimized className={`drop-shadow-md ${getRankInfo(myClan.total_clicks).scaleClass}`} />
-                         <span className={`text-sm font-bold ${getClanTheme(myClan.shield_id).text}`}>{getRankInfo(myClan.total_clicks).name}</span>
+                        <Image src={`/sprites/ranked/${getRankInfo(myClan.total_clicks).id}.png`} alt="Clan Rank" width={20} height={20} unoptimized className={`drop-shadow-md ${getRankInfo(myClan.total_clicks).scaleClass}`} />
+                        <span className={`text-sm font-bold ${getClanTheme(myClan.shield_id).text}`}>{getRankInfo(myClan.total_clicks).name}</span>
                       </div>
                     </div>
 
@@ -333,7 +334,7 @@ export default function ClanModal({
                         Solicitudes Pendientes
                         <span className="bg-amber-500 text-black text-xs px-2 py-1 rounded-full">{requests.length}</span>
                       </h4>
-                      
+
                       {requests.length === 0 ? (
                         <p className="text-white/50 text-sm">No hay solicitudes pendientes.</p>
                       ) : (
@@ -367,13 +368,13 @@ export default function ClanModal({
                       <div className="flex items-center gap-3">
                         <Image src={`/sprites/clan/${clan.shield_id || 1}.png`} alt="Clan Shield" width={40} height={40} unoptimized className="drop-shadow-md" />
                         <div>
-                            <h4 className="text-lg font-bold text-white flex items-center gap-2">
-                                {clan.name}
-                            </h4>
-                            <div className="flex items-center gap-1 text-[10px] text-amber-500/80 font-bold uppercase mt-0.5">
-                                <Image src={`/sprites/ranked/${getRankInfo(clan.total_clicks).id}.png`} alt="Rank" width={12} height={12} unoptimized />
-                                {getRankInfo(clan.total_clicks).name}
-                            </div>
+                          <h4 className="text-lg font-bold text-white flex items-center gap-2">
+                            {clan.name}
+                          </h4>
+                          <div className="flex items-center gap-1 text-[10px] text-amber-500/80 font-bold uppercase mt-0.5">
+                            <Image src={`/sprites/ranked/${getRankInfo(clan.total_clicks).id}.png`} alt="Rank" width={12} height={12} unoptimized />
+                            {getRankInfo(clan.total_clicks).name}
+                          </div>
                         </div>
                       </div>
                       <p className="text-white/50 text-sm mt-1">{clan.description || 'Sin descripción'}</p>
@@ -383,17 +384,17 @@ export default function ClanModal({
                       </div>
                     </div>
                     {clan.id === pendingClanId ? (
-                        <div className="px-4 py-2 bg-orange-500/20 text-orange-400 font-bold rounded-lg border border-orange-500/50">
-                          Enviada ✓
-                        </div>
+                      <div className="px-4 py-2 bg-orange-500/20 text-orange-400 font-bold rounded-lg border border-orange-500/50">
+                        Enviada ✓
+                      </div>
                     ) : (
-                        <button 
-                          onClick={() => handleJoin(clan.id, clan.entry_fee)}
-                          disabled={clan.member_count >= 10 || pendingClanId !== null}
-                          className="px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-500 text-black font-bold rounded-lg shadow-lg hover:shadow-orange-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {clan.member_count >= 10 ? 'Lleno' : 'Unirse'}
-                        </button>
+                      <button
+                        onClick={() => handleJoin(clan.id, clan.entry_fee)}
+                        disabled={clan.member_count >= 10 || pendingClanId !== null}
+                        className="px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-500 text-black font-bold rounded-lg shadow-lg hover:shadow-orange-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {clan.member_count >= 10 ? 'Lleno' : 'Unirse'}
+                      </button>
                     )}
                   </div>
                 ))
@@ -413,12 +414,12 @@ export default function ClanModal({
                 <div className="flex flex-wrap gap-2 justify-center bg-black/40 p-4 rounded-xl border border-white/10">
                   {[...Array(10)].map((_, i) => (
                     <button
-                      key={i+1}
+                      key={i + 1}
                       type="button"
-                      onClick={() => setNewShieldId(i+1)}
-                      className={`p-2 rounded-xl transition-all ${newShieldId === i+1 ? 'bg-orange-500/30 border-2 border-orange-500 scale-110 shadow-[0_0_15px_rgba(249,115,22,0.4)]' : 'border border-transparent hover:bg-white/10 hover:scale-105 opacity-60 hover:opacity-100'}`}
+                      onClick={() => setNewShieldId(i + 1)}
+                      className={`p-2 rounded-xl transition-all ${newShieldId === i + 1 ? 'bg-orange-500/30 border-2 border-orange-500 scale-110 shadow-[0_0_15px_rgba(249,115,22,0.4)]' : 'border border-transparent hover:bg-white/10 hover:scale-105 opacity-60 hover:opacity-100'}`}
                     >
-                      <Image src={`/sprites/clan/${i+1}.png`} alt={`Shield ${i+1}`} width={48} height={48} unoptimized className="drop-shadow-md" />
+                      <Image src={`/sprites/clan/${i + 1}.png`} alt={`Shield ${i + 1}`} width={48} height={48} unoptimized className="drop-shadow-md" />
                     </button>
                   ))}
                 </div>
@@ -426,8 +427,8 @@ export default function ClanModal({
 
               <div>
                 <label className="block text-white/70 text-sm font-bold mb-2">Nombre del Clan</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   maxLength={20}
                   required
                   value={newName}
@@ -439,8 +440,8 @@ export default function ClanModal({
 
               <div>
                 <label className="block text-white/70 text-sm font-bold mb-2">Descripción (Opcional)</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   maxLength={100}
                   value={newDesc}
                   onChange={e => setNewDesc(e.target.value)}
@@ -451,8 +452,8 @@ export default function ClanModal({
 
               <div>
                 <label className="block text-white/70 text-sm font-bold mb-2">Tarifa de Entrada (EggCoins)</label>
-                <input 
-                  type="number" 
+                <input
+                  type="number"
                   min={0}
                   max={5000}
                   value={newFee}
@@ -462,7 +463,7 @@ export default function ClanModal({
                 <p className="text-white/40 text-xs mt-1">Costo que deben pagar los usuarios para unirse (va al pozo personal de cada uno, esto es solo una barrera de entrada opcional).</p>
               </div>
 
-              <button 
+              <button
                 type="submit"
                 disabled={userEggCoins < 1000}
                 className="w-full py-4 mt-4 bg-gradient-to-r from-orange-500 to-amber-500 text-black font-black rounded-xl text-lg hover:shadow-[0_0_20px_rgba(249,115,22,0.4)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
