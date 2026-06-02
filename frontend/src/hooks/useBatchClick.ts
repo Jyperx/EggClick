@@ -127,7 +127,7 @@ export function useBatchClick(
       // Consumir 1 segundo inmediatamente para evitar exploit de clics rápidos
       setLocalTouchMe((prev) => prev - 1);
       usedTouchMeSecondsInBatch.current += 1;
-      
+
       timer = setInterval(() => {
         setLocalTouchMe((prev) => {
           if (prev > 0) {
@@ -143,93 +143,93 @@ export function useBatchClick(
   }, [isHolding]);
 
   const registerClick = (isAuto: boolean = false) => {
-      if (status === "unauthenticated") {
-        setShowLoginPrompt(true);
-        setTimeout(() => setShowLoginPrompt(false), 2000);
-        return false;
-      }
+    if (status === "unauthenticated") {
+      setShowLoginPrompt(true);
+      setTimeout(() => setShowLoginPrompt(false), 2000);
+      return false;
+    }
 
-      // Si está quemado (en cooldown), no permite clics y castiga clics manuales excesivos
-      if (cooldownTime > 0) {
-         if (!isAuto) {
-             overheatClicksBuffer.current += 1;
-             // Margen de gracia: 5 clics
-             if (overheatClicksBuffer.current > 5) {
-                 const penaltySecs = 10;
-                 setCooldownTime(prev => prev + penaltySecs);
-                 
-                 const storageKey = `egg_cooldown_end_${session?.user?.email || 'anon'}`;
-                 const stored = localStorage.getItem(storageKey);
-                 const currentEnd = stored ? parseInt(stored) : Date.now();
-                 localStorage.setItem(storageKey, (currentEnd + penaltySecs * 1000).toString());
-                 
-                 overheatPenaltyClicksToFlush.current += 1;
-                 
-                 setShowOverheatWarning(true);
-                 setTimeout(() => setShowOverheatWarning(false), 2000);
-                 
-                 // Forzar envío para que el servidor lo sepa
-                 setTimeout(() => window.dispatchEvent(new Event("force_flush_egg_clicks")), 0);
-             }
-         }
-         return false;
-      } else {
-         overheatClicksBuffer.current = 0; // Resetear buffer si no está quemado
-      }
-
+    // Si está quemado (en cooldown), no permite clics y castiga clics manuales excesivos
+    if (cooldownTime > 0) {
       if (!isAuto) {
-        lastActivityTimestamp.current = Date.now();
-        setTimeSinceLastClick(0);
-        clicksToFlush.current += 1;
-        consumeMultipliersVisually(1);
+        overheatClicksBuffer.current += 1;
+        // Margen de gracia: 5 clics
+        if (overheatClicksBuffer.current > 5) {
+          const penaltySecs = 10;
+          setCooldownTime(prev => prev + penaltySecs);
+
+          const storageKey = `egg_cooldown_end_${session?.user?.email || 'anon'}`;
+          const stored = localStorage.getItem(storageKey);
+          const currentEnd = stored ? parseInt(stored) : Date.now();
+          localStorage.setItem(storageKey, (currentEnd + penaltySecs * 1000).toString());
+
+          overheatPenaltyClicksToFlush.current += 1;
+
+          setShowOverheatWarning(true);
+          setTimeout(() => setShowOverheatWarning(false), 2000);
+
+          // Forzar envío para que el servidor lo sepa
+          setTimeout(() => window.dispatchEvent(new Event("force_flush_egg_clicks")), 0);
+        }
+      }
+      return false;
+    } else {
+      overheatClicksBuffer.current = 0; // Resetear buffer si no está quemado
+    }
+
+    if (!isAuto) {
+      lastActivityTimestamp.current = Date.now();
+      setTimeSinceLastClick(0);
+      clicksToFlush.current += 1;
+      consumeMultipliersVisually(1);
+    }
+
+    setSessionClicks((prevSession) => {
+      if (freezeTimeLeft > 0) {
+        if (!isAuto) frozenClicksToFlush.current += 1;
+        return prevSession;
       }
 
-      setSessionClicks((prevSession) => {
-        if (freezeTimeLeft > 0) {
-            if (!isAuto) frozenClicksToFlush.current += 1;
-            return prevSession;
-        }
+      const getHighestThreshold = (c: number) => Math.floor(c / 200) * 200;
+      const newClicks = prevSession + 1;
+      let finalClicks = newClicks;
 
-        const getHighestThreshold = (c: number) => Math.floor(c / 200) * 200;
-        const newClicks = prevSession + 1;
-        let finalClicks = newClicks;
+      if (newClicks % 200 >= 190 && localIceHand > 0) {
+        usedIceHandsInBatch.current += 1;
+        // Set ice hand is safe here as it triggers its own state update
+        setLocalIceHand((p) => Math.max(0, p - 1));
+        setFreezeTimeLeft(5);
+        finalClicks = getHighestThreshold(newClicks);
 
-        if (newClicks % 200 >= 190 && localIceHand > 0) {
-          usedIceHandsInBatch.current += 1;
-          // Set ice hand is safe here as it triggers its own state update
-          setLocalIceHand((p) => Math.max(0, p - 1));
-          setFreezeTimeLeft(5);
-          finalClicks = getHighestThreshold(newClicks);
-          
+        setTimeout(() => {
+          window.dispatchEvent(new Event("force_flush_egg_clicks"));
+        }, 0);
+      } else {
+        const oldThresh = getHighestThreshold(prevSession);
+        const newThresh = getHighestThreshold(newClicks);
+
+        if (newThresh > oldThresh) {
+          const penaltyMap: Record<number, number> = {
+            1400: 300, 1200: 160, 1000: 80, 800: 40, 600: 20, 400: 10, 200: 5,
+          };
+          const penalty = penaltyMap[newThresh] || 0;
+
           setTimeout(() => {
+            setCooldownTime(penalty);
+            const storageKey = `egg_cooldown_end_${session?.user?.email || 'anon'}`;
+            localStorage.setItem(storageKey, (Date.now() + penalty * 1000).toString());
             window.dispatchEvent(new Event("force_flush_egg_clicks"));
           }, 0);
-        } else {
-          const oldThresh = getHighestThreshold(prevSession);
-          const newThresh = getHighestThreshold(newClicks);
-
-          if (newThresh > oldThresh) {
-            const penaltyMap: Record<number, number> = {
-              1400: 300, 1200: 160, 1000: 80, 800: 40, 600: 20, 400: 10, 200: 5,
-            };
-            const penalty = penaltyMap[newThresh] || 0;
-            
-            setTimeout(() => {
-                setCooldownTime(penalty);
-                const storageKey = `egg_cooldown_end_${session?.user?.email || 'anon'}`;
-                localStorage.setItem(storageKey, (Date.now() + penalty * 1000).toString());
-                window.dispatchEvent(new Event("force_flush_egg_clicks"));
-            }, 0);
-          }
         }
+      }
 
-        const sessionKey = `egg_session_clicks_${session?.user?.email || 'anon'}`;
-        localStorage.setItem(sessionKey, finalClicks.toString());
-        return finalClicks;
-      });
+      const sessionKey = `egg_session_clicks_${session?.user?.email || 'anon'}`;
+      localStorage.setItem(sessionKey, finalClicks.toString());
+      return finalClicks;
+    });
 
-      return true;
-    };
+    return true;
+  };
 
   // Manejo del contador regresivo de castigo
   useEffect(() => {
@@ -276,27 +276,27 @@ export function useBatchClick(
     if (localAutoclicker > 0 && cooldownTime <= 0) {
       setIsAutoclicking(true);
       lastAutoclickerTick.current = Date.now();
-      
+
       const timer = setInterval(() => {
         const now = Date.now();
         const deltaSecs = Math.floor((now - lastAutoclickerTick.current) / 1000);
-        
+
         if (deltaSecs >= 1) {
-            setLocalAutoclicker((prev) => {
-                const actualSecs = Math.min(deltaSecs, prev);
-                if (actualSecs > 0) {
-                    usedAutoclickerSecondsInBatch.current += actualSecs;
-                    // Los clics locales (temperatura y visuales) son manejados por page.tsx 
-                    // que llama a handleEggClick(true) cada 500ms sincronizadamente.
-                    // Solo mantenemos la visualización de los multiplicadores y el reinicio de inactividad aquí.
-                    consumeMultipliersVisually(actualSecs * 2);
-                    lastActivityTimestamp.current = Date.now();
-                    setTimeSinceLastClick(0);
-                }
-                
-                lastAutoclickerTick.current += actualSecs * 1000;
-                return prev - actualSecs;
-            });
+          setLocalAutoclicker((prev) => {
+            const actualSecs = Math.min(deltaSecs, prev);
+            if (actualSecs > 0) {
+              usedAutoclickerSecondsInBatch.current += actualSecs;
+              // Los clics locales (temperatura y visuales) son manejados por page.tsx 
+              // que llama a handleEggClick(true) cada 500ms sincronizadamente.
+              // Solo mantenemos la visualización de los multiplicadores y el reinicio de inactividad aquí.
+              consumeMultipliersVisually(actualSecs * 2);
+              lastActivityTimestamp.current = Date.now();
+              setTimeSinceLastClick(0);
+            }
+
+            lastAutoclickerTick.current += actualSecs * 1000;
+            return prev - actualSecs;
+          });
         }
       }, 1000);
       return () => {
@@ -352,7 +352,7 @@ export function useBatchClick(
             },
             body: data,
             keepalive: true,
-          }).catch(() => {});
+          }).catch(() => { });
         } else {
           navigator.sendBeacon(
             "http://localhost:8000/api/v1/clicks/beacon",
@@ -371,7 +371,7 @@ export function useBatchClick(
         // Al regresar a la pestaña, evitamos que se penalice inmediatamente por inactividad
         lastActivityTimestamp.current = Date.now();
         if (clicksToFlush.current > 0 || frozenClicksToFlush.current > 0) {
-            flushBatch(true);
+          flushBatch(true);
         }
       }
     };
@@ -463,12 +463,15 @@ export function useBatchClick(
 
     const interval = setInterval(flushBatch, flushInterval);
 
-    window.addEventListener("force_flush_egg_clicks", flushBatch);
+    // Creamos un manejador intermedio para que el objeto Event no choque con el parámetro isForce
+    const handleForceFlush = () => flushBatch();
+
+    window.addEventListener("force_flush_egg_clicks", handleForceFlush);
 
     return () => {
       clearInterval(interval);
       window.removeEventListener("beforeunload", handleBeforeUnload);
-      window.removeEventListener("force_flush_egg_clicks", flushBatch);
+      window.removeEventListener("force_flush_egg_clicks", handleForceFlush);
     };
   }, [flushInterval, onUpdate, session]);
 
@@ -553,8 +556,8 @@ export function useBatchClick(
       setTimeSinceLastClick((prev) => {
         // PREVENIR INACTIVIDAD SI AUTOCLICKER ESTA CORRIENDO
         if (localAutoclicker > 0) {
-            lastActivityTimestamp.current = Date.now();
-            return 0;
+          lastActivityTimestamp.current = Date.now();
+          return 0;
         }
 
         if (secondsInactive >= inactivityTimeLimit && cooldownTime <= 0) {
@@ -606,7 +609,7 @@ export function useBatchClick(
       // Si la diferencia es pequeña (<= 3s), es solo lag de confirmación de nuestro último click,
       // así que mantenemos el valor local para no resetear el timer visualmente.
       if (localTimeSinceLastClick - serverTimeSinceLastClick > 3) {
-          finalTimeSinceLastClick = serverTimeSinceLastClick;
+        finalTimeSinceLastClick = serverTimeSinceLastClick;
       }
 
       // Actualizamos el timestamp de inactividad basándonos en el valor final decidido
@@ -634,29 +637,29 @@ export function useBatchClick(
       setCooldownTime((prev) => {
         // Si acabamos de resetear el cooldown (hace menos de 5 segs), ignoramos los paquetes viejos
         if (Date.now() - lastBypassTimestamp.current < 5000 && serverCooldownTime > 0) {
-            return 0;
+          return 0;
         }
-        
+
         if (serverCooldownTime === 0 && prev > 0) {
           console.log(
             `[🛡️ ANESTHESIA] Manteniendo cooldown local (${prev}s) a pesar de que el servidor reporta 0 (posible lag).`,
           );
           return prev;
         }
-        
+
         let newCooldown = serverCooldownTime || 0;
-        
+
         // Evita saltos locos por respuestas desordenadas o lag del worker ARQ
         if (serverCooldownTime > 0 && prev > 0) {
-            // Solo actualizamos si el server reporta un tiempo significativamente mayor
-            // (lo que indicaría que se sumó una nueva penalidad por clics extra)
-            if (serverCooldownTime > prev + 3) {
-                newCooldown = serverCooldownTime;
-            } else {
-                newCooldown = prev;
-            }
+          // Solo actualizamos si el server reporta un tiempo significativamente mayor
+          // (lo que indicaría que se sumó una nueva penalidad por clics extra)
+          if (serverCooldownTime > prev + 3) {
+            newCooldown = serverCooldownTime;
+          } else {
+            newCooldown = prev;
+          }
         }
-        
+
         const userKey = session?.user?.email || 'anon';
         if (newCooldown > 0) {
           localStorage.setItem(
@@ -666,7 +669,7 @@ export function useBatchClick(
         } else {
           localStorage.removeItem(`egg_cooldown_end_${userKey}`);
         }
-        
+
         return newCooldown;
       });
 

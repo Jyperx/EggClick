@@ -5,10 +5,16 @@ import redis
 
 load_dotenv()
 
-# Usamos la base de datos asíncrona de PostgreSQL (asyncpg)
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost/egg_db")
+# 1. Obtenemos la URL de la base de datos (por defecto la local si no existe la variable)
+raw_db_url = os.getenv("DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost/egg_db")
 
-# Agregamos pool_pre_ping y pool_recycle para evitar bloqueos por conexiones muertas en la nube
+# 2. Reemplazamos el prefijo si viene de Railway (postgresql:// -> postgresql+asyncpg://)
+if raw_db_url.startswith("postgresql://"):
+    DATABASE_URL = raw_db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+else:
+    DATABASE_URL = raw_db_url
+
+# 3. Inicializamos el motor con la URL corregida
 engine = create_async_engine(DATABASE_URL, echo=False, pool_pre_ping=True, pool_recycle=300)
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
