@@ -15,6 +15,7 @@ from decimal import Decimal
 import asyncio
 import json
 import os
+import uvicorn
 from arq import create_pool
 from arq.connections import RedisSettings
 
@@ -360,3 +361,8 @@ app.include_router(ads.router, prefix="/api/v1/ads", tags=["ads"])
 @app.get("/")
 def read_root():
     return {"message": "El Backend del Huevo está corriendo 🥚🚀"}
+
+if __name__ == "__main__":
+    # Lee el puerto que dicta Railway, o usa 8000 si estás en local
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("app.main:app", host="0.0.0.0", port=port)
