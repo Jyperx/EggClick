@@ -855,7 +855,7 @@ export default function GamePage() {
 
         {/* El Huevo Interactivo */}
         <div className="flex flex-col items-center justify-center gap-2 sm:gap-4 my-0 md:my-2 relative flex-1 w-full md:scale-100 origin-top min-h-0">
-          <Egg onEggClick={(isAuto) => handleEggClick(isAuto)} sessionClicks={sessionClicks} cooldownTime={cooldownTime} isFrozen={isFrozen} freezeTimeLeft={freezeTimeLeft} isAutoclicking={isAutoclicking} localMartillo={localMartillo} localHamAss={localHamAss} localTouchMe={localTouchMe} setIsHolding={setIsHolding} inventory={inventory} autoClickTrigger={autoClickTrigger} resetCooldown={(sendToServer) => resetCooldown(sendToServer ? 'force' : undefined)} userId={session?.user?.email || 'anon_user'} showOverheatWarning={showOverheatWarning} />
+          <Egg onEggClick={(isAuto) => handleEggClick(isAuto)} sessionClicks={sessionClicks} cooldownTime={cooldownTime} isFrozen={isFrozen} freezeTimeLeft={freezeTimeLeft} isAutoclicking={isAutoclicking} localMartillo={localMartillo} localHamAss={localHamAss} localTouchMe={localTouchMe} setIsHolding={setIsHolding} inventory={inventory} autoClickTrigger={autoClickTrigger} resetCooldown={(sendToServer) => resetCooldown(sendToServer ? 'force' : undefined)} userId={session?.user?.email || 'anon_user'} showOverheatWarning={showOverheatWarning} isEggBroken={isEggBroken} />
 
           {/* Indicador de Desconexión sobre el huevo */}
           {!isWsConnected && status === 'authenticated' && !isMultiTabBlocked && (
