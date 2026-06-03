@@ -139,7 +139,40 @@ export function useBatchClick(
             if (actualSecs > 0) {
               usedTouchMeSecondsInBatch.current += actualSecs;
               prevTick += actualSecs * 1000;
-              return prev - actualSecs;
+              
+              setSessionClicks((prevSession) => {
+                if (freezeTimeLeft > 0) return prevSession;
+                const getHighestThreshold = (c: number) => Math.floor(c / 200) * 200;
+                let finalClicks = prevSession + (actualSecs * 20);
+                
+                if (finalClicks % 200 >= 190 && localIceHand > 0) {
+                  usedIceHandsInBatch.current += 1;
+                  setLocalIceHand((p) => Math.max(0, p - 1));
+                  setFreezeTimeLeft(5);
+                  finalClicks = getHighestThreshold(finalClicks);
+                  setTimeout(() => window.dispatchEvent(new Event("force_flush_egg_clicks")), 0);
+                } else {
+                  const oldThresh = getHighestThreshold(prevSession);
+                  const newThresh = getHighestThreshold(finalClicks);
+                  if (newThresh > oldThresh) {
+                    const penaltyMap: Record<number, number> = {
+                      1400: 300, 1200: 160, 1000: 80, 800: 40, 600: 20, 400: 10, 200: 5,
+                    };
+                    const penalty = penaltyMap[newThresh] || 0;
+                    if (penalty > 0) {
+                      setTimeout(() => {
+                        setCooldownTime(penalty);
+                        const storageKey = `egg_cooldown_end_${session?.user?.email || 'anon'}`;
+                        localStorage.setItem(storageKey, (Date.now() + penalty * 1000).toString());
+                        window.dispatchEvent(new Event("force_flush_egg_clicks"));
+                      }, 0);
+                    }
+                  }
+                }
+                return finalClicks;
+              });
+              
+              return Number((prev - actualSecs).toFixed(2));
             }
             clearInterval(timer);
             return 0;
@@ -190,51 +223,50 @@ export function useBatchClick(
       setTimeSinceLastClick(0);
       clicksToFlush.current += 1;
       consumeMultipliersVisually(1);
-    }
 
-    setSessionClicks((prevSession) => {
-      if (freezeTimeLeft > 0) {
-        if (!isAuto) frozenClicksToFlush.current += 1;
-        return prevSession;
-      }
+      setSessionClicks((prevSession) => {
+        if (freezeTimeLeft > 0) {
+          frozenClicksToFlush.current += 1;
+          return prevSession;
+        }
 
-      const getHighestThreshold = (c: number) => Math.floor(c / 200) * 200;
-      const newClicks = prevSession + 1;
-      let finalClicks = newClicks;
+        const getHighestThreshold = (c: number) => Math.floor(c / 200) * 200;
+        const newClicks = prevSession + 1;
+        let finalClicks = newClicks;
 
-      if (newClicks % 200 >= 190 && localIceHand > 0) {
-        usedIceHandsInBatch.current += 1;
-        // Set ice hand is safe here as it triggers its own state update
-        setLocalIceHand((p) => Math.max(0, p - 1));
-        setFreezeTimeLeft(5);
-        finalClicks = getHighestThreshold(newClicks);
-
-        setTimeout(() => {
-          window.dispatchEvent(new Event("force_flush_egg_clicks"));
-        }, 0);
-      } else {
-        const oldThresh = getHighestThreshold(prevSession);
-        const newThresh = getHighestThreshold(newClicks);
-
-        if (newThresh > oldThresh) {
-          const penaltyMap: Record<number, number> = {
-            1400: 300, 1200: 160, 1000: 80, 800: 40, 600: 20, 400: 10, 200: 5,
-          };
-          const penalty = penaltyMap[newThresh] || 0;
+        if (newClicks % 200 >= 190 && localIceHand > 0) {
+          usedIceHandsInBatch.current += 1;
+          setLocalIceHand((p) => Math.max(0, p - 1));
+          setFreezeTimeLeft(5);
+          finalClicks = getHighestThreshold(newClicks);
 
           setTimeout(() => {
-            setCooldownTime(penalty);
-            const storageKey = `egg_cooldown_end_${session?.user?.email || 'anon'}`;
-            localStorage.setItem(storageKey, (Date.now() + penalty * 1000).toString());
             window.dispatchEvent(new Event("force_flush_egg_clicks"));
           }, 0);
-        }
-      }
+        } else {
+          const oldThresh = getHighestThreshold(prevSession);
+          const newThresh = getHighestThreshold(newClicks);
 
-      const sessionKey = `egg_session_clicks_${session?.user?.email || 'anon'}`;
-      localStorage.setItem(sessionKey, finalClicks.toString());
-      return finalClicks;
-    });
+          if (newThresh > oldThresh) {
+            const penaltyMap: Record<number, number> = {
+              1400: 300, 1200: 160, 1000: 80, 800: 40, 600: 20, 400: 10, 200: 5,
+            };
+            const penalty = penaltyMap[newThresh] || 0;
+
+            setTimeout(() => {
+              setCooldownTime(penalty);
+              const storageKey = `egg_cooldown_end_${session?.user?.email || 'anon'}`;
+              localStorage.setItem(storageKey, (Date.now() + penalty * 1000).toString());
+              window.dispatchEvent(new Event("force_flush_egg_clicks"));
+            }, 0);
+          }
+        }
+
+        const sessionKey = `egg_session_clicks_${session?.user?.email || 'anon'}`;
+        localStorage.setItem(sessionKey, finalClicks.toString());
+        return finalClicks;
+      });
+    }
 
     return true;
   };
@@ -294,16 +326,45 @@ export function useBatchClick(
             const actualSecs = Math.min(deltaSecs, prev);
             if (actualSecs > 0) {
               usedAutoclickerSecondsInBatch.current += actualSecs;
-              // Los clics locales (temperatura y visuales) son manejados por page.tsx 
-              // que llama a handleEggClick(true) cada 500ms sincronizadamente.
-              // Solo mantenemos la visualización de los multiplicadores y el reinicio de inactividad aquí.
               consumeMultipliersVisually(actualSecs * 2);
               lastActivityTimestamp.current = Date.now();
               setTimeSinceLastClick(0);
+              
+              setSessionClicks((prevSession) => {
+                if (freezeTimeLeft > 0) return prevSession;
+                const getHighestThreshold = (c: number) => Math.floor(c / 200) * 200;
+                let finalClicks = prevSession + (actualSecs * 2);
+                
+                if (finalClicks % 200 >= 190 && localIceHand > 0) {
+                  usedIceHandsInBatch.current += 1;
+                  setLocalIceHand((p) => Math.max(0, p - 1));
+                  setFreezeTimeLeft(5);
+                  finalClicks = getHighestThreshold(finalClicks);
+                  setTimeout(() => window.dispatchEvent(new Event("force_flush_egg_clicks")), 0);
+                } else {
+                  const oldThresh = getHighestThreshold(prevSession);
+                  const newThresh = getHighestThreshold(finalClicks);
+                  if (newThresh > oldThresh) {
+                    const penaltyMap: Record<number, number> = {
+                      1400: 300, 1200: 160, 1000: 80, 800: 40, 600: 20, 400: 10, 200: 5,
+                    };
+                    const penalty = penaltyMap[newThresh] || 0;
+                    if (penalty > 0) {
+                      setTimeout(() => {
+                        setCooldownTime(penalty);
+                        const storageKey = `egg_cooldown_end_${session?.user?.email || 'anon'}`;
+                        localStorage.setItem(storageKey, (Date.now() + penalty * 1000).toString());
+                        window.dispatchEvent(new Event("force_flush_egg_clicks"));
+                      }, 0);
+                    }
+                  }
+                }
+                return finalClicks;
+              });
             }
 
             lastAutoclickerTick.current += actualSecs * 1000;
-            return prev - actualSecs;
+            return Number((prev - actualSecs).toFixed(2));
           });
         }
       }, 500);

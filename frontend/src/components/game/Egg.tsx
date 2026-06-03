@@ -70,9 +70,11 @@ export default function Egg({ onEggClick, sessionClicks = 0, cooldownTime = 0, i
 
   useEffect(() => {
     if (isHoldingLocal && touchMeSecs > 0 && !isOverheated) {
+      let counter = 0;
       const timer = setInterval(() => {
         onEggClick(true);
-        playClickSound();
+        counter++;
+        if (counter % 3 === 0) playClickSound();
         setWobble(true);
         setTimeout(() => setWobble(false), 20);
 
