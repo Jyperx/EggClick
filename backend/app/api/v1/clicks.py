@@ -395,6 +395,8 @@ async def _process_click_batch_core(batch: ClickBatch, user_id: str, db: AsyncSe
     required_str = await redis_client.get("global_egg_total_clicks")
     required_clicks = int(required_str) if required_str else 1000000000
     
+    await pipe.execute()
+    
     if new_global_clicks >= required_clicks:
         # ¡El huevo ha sido roto! Intentamos adquirir el lock atómico para ser el ganador único
         won = await redis_client.setnx("egg_break_lock", "1")
@@ -470,8 +472,6 @@ async def _process_click_batch_core(batch: ClickBatch, user_id: str, db: AsyncSe
                     await db.commit()
             except Exception as e:
                 print(f"Error closing season in DB: {e}")
-
-    results = await pipe.execute()
     
     if clan_id and clan_tax > 0:
         current_clan_coins = await redis_client.hget(f"clan_state:{clan_id}", "egg_coins")
