@@ -7,7 +7,7 @@ security = HTTPBearer()
 
 async def get_current_user_id(credentials: HTTPAuthorizationCredentials = Security(security)):
     token = credentials.credentials
-    secret = os.getenv("JWT_SECRET", "super-secret-key-egg-game")
+    secret = os.environ["JWT_SECRET"]
     try:
         payload = jwt.decode(token, secret, algorithms=["HS256"])
         user_id = payload.get("sub")

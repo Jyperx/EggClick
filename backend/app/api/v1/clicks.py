@@ -56,7 +56,7 @@ async def register_clicks(
     if not user_id and batch.jwt_token:
         import jwt
         import os
-        secret = os.getenv("JWT_SECRET", "super-secret-key-egg-game")
+        secret = os.environ["JWT_SECRET"]
         try:
             decoded = jwt.decode(batch.jwt_token, secret, algorithms=["HS256"])
             user_id = decoded.get("sub")
@@ -82,7 +82,7 @@ async def beacon_clicks(request: Request, db: AsyncSession = Depends(get_db)):
     if batch.jwt_token:
         import jwt
         import os
-        secret = os.getenv("JWT_SECRET", "super-secret-key-egg-game")
+        secret = os.environ["JWT_SECRET"]
         try:
             decoded = jwt.decode(batch.jwt_token, secret, algorithms=["HS256"])
             user_id = decoded.get("sub")
@@ -165,7 +165,7 @@ async def process_click_batch(batch: ClickBatch, user_id: str, db: AsyncSession)
     if hasattr(batch, 'bypass_cooldown_token') and batch.bypass_cooldown_token:
         try:
             import jwt, os
-            secret = os.getenv("JWT_SECRET", "super-secret-key-egg-game")
+            secret = os.environ["JWT_SECRET"]
             decoded = jwt.decode(batch.bypass_cooldown_token, secret, algorithms=["HS256"])
             if decoded.get("sub") == "adsense_reward": bypass_cooldown = True
         except Exception: pass
@@ -229,9 +229,20 @@ async def process_click_batch(batch: ClickBatch, user_id: str, db: AsyncSession)
     if last_activity_iso:
         try:
             last_act = datetime.datetime.fromisoformat(last_activity_iso)
-            max_physical_seconds = max(2.0, (now - last_act).total_seconds() + 1.0)
+            max_physical_seconds = max(1.0, (now - last_act).total_seconds() + 1.0)
         except Exception:
             pass
+
+    # Lógica Anti-Bot estricta: Validar que el volumen de clics sea humanamente posible
+    # Límite: 30 clics por segundo (bastante generoso).
+    max_human_cps = 30
+    max_allowed_manual_clicks = int(max_physical_seconds * max_human_cps)
+    total_requested = batch.clicks + batch.frozen_clicks
+    if total_requested > max_allowed_manual_clicks:
+        if total_requested > 0:
+            ratio = max_allowed_manual_clicks / total_requested
+            batch.clicks = int(batch.clicks * ratio)
+            batch.frozen_clicks = int(batch.frozen_clicks * ratio)
 
     inventory["last_click_at"] = now.isoformat()
     

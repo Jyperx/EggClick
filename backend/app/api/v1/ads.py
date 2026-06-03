@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 load_dotenv()
 router = APIRouter()
 
-SECRET_KEY = os.getenv("JWT_SECRET", "super-secret-key-egg-game")
+SECRET_KEY = os.environ["JWT_SECRET"]
 
 class AdTokenResponse(BaseModel):
     token: str

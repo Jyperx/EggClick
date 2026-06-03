@@ -11,7 +11,7 @@ async def verify_jwt(credentials: HTTPAuthorizationCredentials = Security(securi
         return None
         
     token = credentials.credentials
-    secret = os.getenv("JWT_SECRET", "super-secret-key-egg-game")
+    secret = os.environ["JWT_SECRET"]
     
     try:
         decoded = jwt.decode(token, secret, algorithms=["HS256"])

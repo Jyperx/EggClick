@@ -262,7 +262,7 @@ async def user_websocket_endpoint(websocket: WebSocket, user_id: str):
         return
         
     import jwt, os
-    secret = os.getenv("JWT_SECRET", "super-secret-key-egg-game")
+    secret = os.environ["JWT_SECRET"]
     try:
         decoded = jwt.decode(token, secret, algorithms=["HS256"])
         if decoded.get("sub") != user_id:
