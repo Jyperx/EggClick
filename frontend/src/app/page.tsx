@@ -10,7 +10,7 @@ import EggTemperaturePanel from '@/components/game/EggTemperaturePanel';
 import FloatingNotifications, { NotificationItem } from '@/components/game/FloatingNotifications';
 import { useBatchClick } from '@/hooks/useBatchClick';
 import { CountryCode, formatCurrency } from '@/lib/currency';
-import { ShoppingBag, Trophy, Loader2, WifiOff, Gift, X, Shield, Gamepad2, Settings, LogOut, User, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { ShoppingBag, Trophy, Loader2, WifiOff, Gift, X, Shield, Gamepad2, Settings, LogOut, User, ShieldAlert, ShieldCheck, ChevronRight, ChevronLeft } from 'lucide-react';
 import { DailySpinModal } from '@/components/game/DailySpinModal';
 
 import { getRankInfo } from '@/lib/ranking';
@@ -58,6 +58,8 @@ export default function GamePage() {
   const [isEggBroken, setIsEggBroken] = useState(false);
   const [eggWinner, setEggWinner] = useState<string | null>(null);
   const [seasonMode, setSeasonMode] = useState<string>("ganador_absoluto");
+  const [seasonWinners, setSeasonWinners] = useState<any[]>([]);
+  const [brokenEggTab, setBrokenEggTab] = useState<'info' | 'contact'>('info');
   const [showNewSeasonModal, setShowNewSeasonModal] = useState(false);
   const [seasonWinners, setSeasonWinners] = useState<any[]>([]);
   const [showContactForm, setShowContactForm] = useState(false);
@@ -340,6 +342,8 @@ export default function GamePage() {
           if (data && data.is_active === false) {
             setIsEggBroken(true);
             setEggWinner(data.winner || "Desconocido");
+            if (data.season_mode) setSeasonMode(data.season_mode);
+            if (data.winners) setSeasonWinners(data.winners);
           } else {
             setIsEggBroken(false);
           }
@@ -1253,133 +1257,154 @@ export default function GamePage() {
               <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-yellow-500/10 via-transparent to-transparent pointer-events-none" />
 
               {/* Título e Icono principal condicional */}
-              {(() => {
-                const isWinner = seasonWinners.find(w => w.user_id === (session?.user?.email || 'anon_user') || w.username === username);
-                if (isWinner) {
-                  return (
-                    <>
-                      <motion.div
-                        initial={{ rotate: -10, scale: 0.8 }}
-                        animate={{ rotate: [0, -10, 10, -10, 10, 0], scale: [1, 1.1, 1] }}
-                        transition={{ duration: 1.5, ease: "easeInOut", times: [0, 0.2, 0.4, 0.6, 0.8, 1] }}
-                      >
-                        <Trophy className="w-24 h-24 text-yellow-500 mb-4 drop-shadow-[0_0_25px_rgba(234,179,8,0.8)]" />
-                      </motion.div>
-                      <h2 className="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-200 to-yellow-600 mb-2 text-center uppercase tracking-widest drop-shadow-sm">
-                        ¡ERES UN GANADOR!
-                      </h2>
-                      <p className="text-yellow-400 font-bold text-lg md:text-xl mb-6 uppercase tracking-wider bg-yellow-500/10 px-4 py-1 rounded-full border border-yellow-500/50 text-center">
-                        {isWinner.reason}
-                      </p>
-                    </>
-                  );
-                } else {
-                  return (
-                    <>
-                      <motion.div
-                        initial={{ rotate: -10, scale: 0.8 }}
-                        animate={{ rotate: [0, -10, 10, -10, 10, 0], scale: [1, 1.1, 1] }}
-                        transition={{ duration: 1.5, ease: "easeInOut", times: [0, 0.2, 0.4, 0.6, 0.8, 1] }}
-                      >
-                        <ShieldAlert className="w-20 h-20 text-yellow-500 mb-4 drop-shadow-[0_0_20px_rgba(234,179,8,0.6)]" />
-                      </motion.div>
-                      <h2 className="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-200 to-yellow-600 mb-2 text-center uppercase tracking-widest drop-shadow-sm">
-                        ¡HUEVO ROTO!
-                      </h2>
-                      <p className="text-yellow-200/80 text-lg mb-6 text-center font-medium">
-                        La temporada ha finalizado.
-                      </p>
-                    </>
-                  );
-                }
-              })()}
+              {brokenEggTab === 'info' ? (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full flex flex-col items-center">
+                  {(() => {
+                    const isWinner = seasonWinners.find(w => w.user_id === (session?.user?.email || 'anon_user') || w.username === username);
+                    if (isWinner) {
+                      return (
+                        <>
+                          <motion.div
+                            initial={{ rotate: -10, scale: 0.8 }}
+                            animate={{ rotate: [0, -10, 10, -10, 10, 0], scale: [1, 1.1, 1] }}
+                            transition={{ duration: 1.5, ease: "easeInOut", times: [0, 0.2, 0.4, 0.6, 0.8, 1] }}
+                          >
+                            <Trophy className="w-16 h-16 md:w-24 md:h-24 text-yellow-500 mb-4 drop-shadow-[0_0_25px_rgba(234,179,8,0.8)]" />
+                          </motion.div>
+                          <h2 className="text-3xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-200 to-yellow-600 mb-2 text-center uppercase tracking-widest drop-shadow-sm">
+                            ¡ERES UN GANADOR!
+                          </h2>
+                          <p className="text-yellow-400 font-bold text-sm md:text-xl mb-6 uppercase tracking-wider bg-yellow-500/10 px-4 py-1 rounded-full border border-yellow-500/50 text-center">
+                            {isWinner.reason}
+                          </p>
+                        </>
+                      );
+                    } else {
+                      return (
+                        <>
+                          <motion.div
+                            initial={{ rotate: -10, scale: 0.8 }}
+                            animate={{ rotate: [0, -10, 10, -10, 10, 0], scale: [1, 1.1, 1] }}
+                            transition={{ duration: 1.5, ease: "easeInOut", times: [0, 0.2, 0.4, 0.6, 0.8, 1] }}
+                          >
+                            <ShieldAlert className="w-16 h-16 md:w-20 md:h-20 text-yellow-500 mb-4 drop-shadow-[0_0_20px_rgba(234,179,8,0.6)]" />
+                          </motion.div>
+                          <h2 className="text-3xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-200 to-yellow-600 mb-2 text-center uppercase tracking-widest drop-shadow-sm">
+                            ¡HUEVO ROTO!
+                          </h2>
+                          <p className="text-yellow-200/80 text-sm md:text-lg mb-6 text-center font-medium">
+                            La temporada ha finalizado.
+                          </p>
+                        </>
+                      );
+                    }
+                  })()}
 
-              <div className="w-full bg-slate-900/80 rounded-2xl p-6 border border-yellow-500/30 shadow-inner relative z-10 mb-6 flex flex-col items-center">
-                <span className="text-slate-400 font-black uppercase tracking-widest text-sm mb-4">TABLA DE GANADORES</span>
-                
-                {seasonWinners.length > 0 ? (
-                  <div className="w-full overflow-hidden rounded-xl border border-slate-700">
-                    <table className="w-full text-left text-sm text-slate-300">
-                      <thead className="bg-slate-800 text-slate-400 uppercase text-xs tracking-wider">
-                        <tr>
-                          <th className="px-4 py-3 font-black">Jugador</th>
-                          <th className="px-4 py-3 font-black">Posición</th>
-                          <th className="px-4 py-3 font-black text-right">Premio</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {seasonWinners.map((w, idx) => (
-                          <tr key={idx} className="border-t border-slate-700/50 hover:bg-slate-700/30 transition-colors">
-                            <td className="px-4 py-4 font-bold text-white text-base">{w.username}</td>
-                            <td className="px-4 py-4 text-xs font-semibold text-yellow-500">{w.reason.toUpperCase()}</td>
-                            <td className="px-4 py-4 text-right font-black text-green-400 text-base">${w.prize_usd.toFixed(2)} USD</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  <div className="w-full bg-slate-900/80 rounded-2xl p-4 md:p-6 border border-yellow-500/30 shadow-inner relative z-10 mb-6 flex flex-col items-center">
+                    <span className="text-slate-400 font-black uppercase tracking-widest text-xs md:text-sm mb-4">TABLA DE GANADORES</span>
+                    
+                    {seasonWinners.length > 0 ? (
+                      <div className="w-full overflow-x-auto rounded-xl border border-slate-700">
+                        <table className="w-full text-left text-xs md:text-sm text-slate-300 min-w-[300px]">
+                          <thead className="bg-slate-800 text-slate-400 uppercase tracking-wider">
+                            <tr>
+                              <th className="px-3 md:px-4 py-3 font-black">Jugador</th>
+                              <th className="px-3 md:px-4 py-3 font-black">Posición</th>
+                              <th className="px-3 md:px-4 py-3 font-black text-right">Premio</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {seasonWinners.map((w, idx) => (
+                              <tr key={idx} className="border-t border-slate-700/50 hover:bg-slate-700/30 transition-colors">
+                                <td className="px-3 md:px-4 py-3 md:py-4 font-bold text-white text-xs md:text-base">{w.username}</td>
+                                <td className="px-3 md:px-4 py-3 md:py-4 text-[10px] md:text-xs font-semibold text-yellow-500">{w.reason.toUpperCase()}</td>
+                                <td className="px-3 md:px-4 py-3 md:py-4 text-right font-black text-green-400 text-xs md:text-base">${w.prize_usd.toFixed(2)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="text-center w-full">
+                        <span className="text-2xl md:text-5xl font-black text-white truncate block">
+                          {eggWinner || 'Desconocido'}
+                        </span>
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <div className="text-center w-full">
-                    <span className="text-3xl md:text-5xl font-black text-white truncate block">
-                      {eggWinner || 'Desconocido'}
-                    </span>
-                  </div>
-                )}
-              </div>
 
-              {seasonWinners.some(w => w.user_id === (session?.user?.email || 'anon_user') || w.username === username) && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 1.0 }}
-                  className="w-full mb-6 p-5 bg-green-950/40 border-2 border-green-500/50 rounded-2xl relative z-10 shadow-[0_0_20px_rgba(34,197,94,0.1)]"
-                >
-                  <h3 className="text-green-400 font-black mb-3 text-center uppercase tracking-widest">Reclama tu premio</h3>
-                  {contactSubmitted ? (
-                    <div className="text-center font-bold text-green-300 bg-green-900/40 p-3 rounded-lg border border-green-500/30">
-                      ¡Datos enviados! Nos pondremos en contacto contigo pronto.
-                    </div>
-                  ) : (
-                    <form onSubmit={submitContactInfo} className="flex flex-col gap-4">
-                      <div>
-                        <label className="text-xs font-bold text-green-200/80 mb-1 block uppercase tracking-wider">Método de Contacto</label>
-                        <input 
-                          type="text" 
-                          required
-                          value={contactMethod}
-                          onChange={(e) => setContactMethod(e.target.value)}
-                          className="w-full bg-black/50 border border-green-500/30 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-green-400 focus:ring-1 focus:ring-green-400 transition-all placeholder-green-900/50 font-medium" 
-                          placeholder="Ej. Binance, PayPal, WhatsApp, Discord"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs font-bold text-green-200/80 mb-1 block uppercase tracking-wider">Tus Datos</label>
-                        <input 
-                          type="text" 
-                          required
-                          value={contactDetails}
-                          onChange={(e) => setContactDetails(e.target.value)}
-                          className="w-full bg-black/50 border border-green-500/30 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-green-400 focus:ring-1 focus:ring-green-400 transition-all placeholder-green-900/50 font-medium" 
-                          placeholder="Ej. usuario@ejemplo.com o +12345678"
-                        />
-                      </div>
-                      <button type="submit" className="mt-2 w-full bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 text-white font-black py-3 rounded-xl transition-all shadow-[0_0_15px_rgba(34,197,94,0.3)] hover:shadow-[0_0_25px_rgba(34,197,94,0.5)] active:scale-95 uppercase tracking-wider">
-                        ENVIAR MIS DATOS
-                      </button>
-                    </form>
+                  {seasonWinners.some(w => w.user_id === (session?.user?.email || 'anon_user') || w.username === username) && (
+                    <button 
+                      onClick={() => setBrokenEggTab('contact')}
+                      className="w-full mb-6 p-4 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 text-white font-black rounded-2xl relative z-10 shadow-[0_0_20px_rgba(34,197,94,0.3)] hover:shadow-[0_0_30px_rgba(34,197,94,0.5)] transition-all flex items-center justify-center gap-2 uppercase tracking-widest active:scale-95 text-sm md:text-base"
+                    >
+                      <Trophy className="w-5 h-5 text-yellow-300" />
+                      Reclamar Premio
+                      <ChevronRight className="w-5 h-5" />
+                    </button>
                   )}
+
+                  <motion.p
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 2.0 }}
+                    className="text-yellow-500/50 uppercase tracking-widest text-[10px] md:text-xs font-bold text-center relative z-10"
+                  >
+                    El juego está en pausa.<br />
+                    Preparando la nueva temporada...
+                  </motion.p>
+                </motion.div>
+              ) : (
+                <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="w-full flex flex-col items-center relative z-10">
+                  <button 
+                    onClick={() => setBrokenEggTab('info')}
+                    className="absolute -top-4 left-0 text-slate-400 hover:text-white transition-colors flex items-center gap-1 text-xs font-bold uppercase tracking-widest"
+                  >
+                    <ChevronLeft className="w-4 h-4" /> Volver
+                  </button>
+
+                  <div className="w-full mt-6 mb-2 p-5 md:p-8 bg-green-950/40 border-2 border-green-500/50 rounded-2xl shadow-[0_0_20px_rgba(34,197,94,0.1)]">
+                    <div className="flex flex-col items-center mb-6">
+                      <Trophy className="w-12 h-12 md:w-16 md:h-16 text-yellow-400 mb-3 drop-shadow-[0_0_15px_rgba(234,179,8,0.5)]" />
+                      <h3 className="text-green-400 font-black text-center uppercase tracking-widest text-lg md:text-xl">Reclama tu premio</h3>
+                    </div>
+
+                    {contactSubmitted ? (
+                      <div className="text-center font-bold text-green-300 bg-green-900/40 p-4 rounded-xl border border-green-500/30 text-sm md:text-base">
+                        ¡Datos enviados! Nos pondremos en contacto contigo pronto.
+                      </div>
+                    ) : (
+                      <form onSubmit={submitContactInfo} className="flex flex-col gap-4 md:gap-5">
+                        <div>
+                          <label className="text-[10px] md:text-xs font-bold text-green-200/80 mb-2 block uppercase tracking-wider">Método de Contacto</label>
+                          <input 
+                            type="text" 
+                            required
+                            value={contactMethod}
+                            onChange={(e) => setContactMethod(e.target.value)}
+                            className="w-full bg-black/50 border border-green-500/30 rounded-xl px-4 py-3 md:py-4 text-white focus:outline-none focus:border-green-400 focus:ring-1 focus:ring-green-400 transition-all placeholder-green-900/50 font-medium text-sm md:text-base" 
+                            placeholder="Ej. Binance, PayPal, WhatsApp"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] md:text-xs font-bold text-green-200/80 mb-2 block uppercase tracking-wider">Tus Datos</label>
+                          <input 
+                            type="text" 
+                            required
+                            value={contactDetails}
+                            onChange={(e) => setContactDetails(e.target.value)}
+                            className="w-full bg-black/50 border border-green-500/30 rounded-xl px-4 py-3 md:py-4 text-white focus:outline-none focus:border-green-400 focus:ring-1 focus:ring-green-400 transition-all placeholder-green-900/50 font-medium text-sm md:text-base" 
+                            placeholder="Ej. usuario@ejemplo.com"
+                          />
+                        </div>
+                        <button type="submit" className="mt-4 w-full bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 text-white font-black py-4 rounded-xl transition-all shadow-[0_0_15px_rgba(34,197,94,0.3)] hover:shadow-[0_0_25px_rgba(34,197,94,0.5)] active:scale-95 uppercase tracking-wider text-sm md:text-base">
+                          ENVIAR MIS DATOS
+                        </button>
+                      </form>
+                    )}
+                  </div>
                 </motion.div>
               )}
-
-              <motion.p
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 2.0 }}
-                className="text-yellow-500/50 uppercase tracking-widest text-xs font-bold text-center relative z-10"
-              >
-                El juego está en pausa.<br />
-                Preparando la nueva temporada...
-              </motion.p>
             </motion.div>
           </motion.div>
         )}
@@ -1580,27 +1605,27 @@ export default function GamePage() {
                 <Trophy className="w-20 h-20 text-yellow-500 mb-4 drop-shadow-[0_0_20px_rgba(234,179,8,0.6)]" />
               </motion.div>
 
-              <h2 className="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-200 to-yellow-600 mb-2 uppercase tracking-widest text-center drop-shadow-sm">
+              <h2 className="text-3xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-200 to-yellow-600 mb-2 uppercase tracking-widest text-center drop-shadow-sm">
                 ¡NUEVA TEMPORADA!
               </h2>
-              <p className="text-yellow-200/80 text-lg mb-8 text-center font-medium">
+              <p className="text-yellow-200/80 text-sm md:text-lg mb-6 text-center font-medium">
                 Una nueva era ha comenzado. ¡Prepara tus dedos y compite!
               </p>
 
-              <div className="w-full bg-slate-900/80 rounded-2xl p-6 border border-yellow-500/30 shadow-inner relative z-10">
-                <div className="flex flex-col items-center justify-center mb-6 pb-6 border-b border-yellow-500/20">
-                  <span className="text-slate-400 font-black uppercase tracking-widest text-sm mb-1">PREMIO BASE INICIAL</span>
-                  <span className="text-5xl font-black text-green-400 drop-shadow-[0_0_10px_rgba(74,222,128,0.4)]">
+              <div className="w-full bg-slate-900/80 rounded-2xl p-4 md:p-6 border border-yellow-500/30 shadow-inner relative z-10">
+                <div className="flex flex-col items-center justify-center mb-4 pb-4 border-b border-yellow-500/20">
+                  <span className="text-slate-400 font-black uppercase tracking-widest text-xs mb-1">PREMIO BASE INICIAL</span>
+                  <span className="text-4xl md:text-5xl font-black text-green-400 drop-shadow-[0_0_10px_rgba(74,222,128,0.4)]">
                     {formatCurrency(baseUsdPrize, userCountry)}
                   </span>
                 </div>
 
                 <div className="flex flex-col items-center text-center">
-                  <span className="inline-block px-4 py-1 rounded-full bg-yellow-500/20 border border-yellow-500/50 text-yellow-400 font-bold uppercase tracking-widest text-xs mb-4">
+                  <span className="inline-block px-3 py-1 rounded-full bg-yellow-500/20 border border-yellow-500/50 text-yellow-400 font-bold uppercase tracking-widest text-[10px] md:text-xs mb-3">
                     MODO: {seasonMode.replace('_', ' ')}
                   </span>
                   
-                  <p className="text-base text-slate-300 leading-relaxed font-medium">
+                  <p className="text-sm md:text-base text-slate-300 leading-relaxed font-medium">
                     {seasonMode === 'ganador_absoluto' && (
                       <>El jugador que dé el <span className="text-yellow-400 font-bold">golpe de gracia definitivo</span> se llevará el <span className="text-green-400 font-bold">100% del premio</span>.</>
                     )}

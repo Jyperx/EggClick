@@ -43,7 +43,38 @@ async def get_game_state(db: AsyncSession = Depends(get_db)):
         winner = redis_winner.decode('utf-8') if hasattr(redis_winner, 'decode') else redis_winner
         if not winner:
             winner = "Desconocido"
-    
+            
+        current_season = await redis_client.get("global_egg_current_season")
+        if current_season:
+            season_str = current_season.decode('utf-8') if hasattr(current_season, 'decode') else str(current_season)
+            winners_json = await redis_client.hget("season_winners_history", season_str)
+            if winners_json:
+                import json
+                try:
+                    winners_record = json.loads(winners_json)
+                    return {
+                        "current_clicks": current_clicks,
+                        "required_clicks": total_clicks,
+                        "prize_usd": prize_usd,
+                        "is_active": is_active,
+                        "winner": winner,
+                        "season_mode": winners_record.get("mode", "ganador_absoluto"),
+                        "winners": winners_record.get("winners", [])
+                    }
+                except Exception:
+                    pass
+    else:
+        season_mode_str = await redis_client.get("global_egg_season_mode")
+        season_mode = season_mode_str.decode('utf-8') if hasattr(season_mode_str, 'decode') else (season_mode_str or "ganador_absoluto")
+        return {
+            "current_clicks": current_clicks,
+            "required_clicks": total_clicks,
+            "prize_usd": prize_usd,
+            "is_active": is_active,
+            "winner": winner,
+            "season_mode": season_mode,
+            "winners": []
+        }    
     return {
         "current_clicks": current_clicks,
         "required_clicks": total_clicks,
