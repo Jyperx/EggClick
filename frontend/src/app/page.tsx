@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Egg from '@/components/game/Egg';
 import PrizePool from '@/components/game/PrizePool';
 import StorePanel from '@/components/shop/StorePanel';
+import HeatParticles from '@/components/game/HeatParticles';
 import LeaderboardPanel from '@/components/social/LeaderboardPanel';
 import ClanModal from '@/components/social/ClanModal';
 import EggTemperaturePanel from '@/components/game/EggTemperaturePanel';
@@ -601,13 +602,80 @@ export default function GamePage() {
     }
   }, [isAutoclicking]);
 
+  const prizePoolNode = useMemo(() => (
+    <PrizePool baseUsdAmount={baseUsdPrize} userCountry={userCountry} />
+  ), [baseUsdPrize, userCountry]);
+
+  const storePanelNode = useMemo(() => (
+    <StorePanel
+      isOpen={isStoreOpen}
+      onClose={() => setIsStoreOpen(false)}
+      userCountry={userCountry}
+      eggCoins={eggCoins}
+    />
+  ), [isStoreOpen, userCountry, eggCoins]);
+
+  const leaderboardPanelNode = useMemo(() => (
+    <LeaderboardPanel
+      isOpen={isLeaderboardOpen}
+      onClose={() => setIsLeaderboardOpen(false)}
+    />
+  ), [isLeaderboardOpen]);
+
+  const clanModalNode = useMemo(() => (
+    <ClanModal
+      isOpen={isClanOpen}
+      onClose={() => setIsClanOpen(false)}
+      userId={session?.user?.email || ''}
+      userClanId={userClanId}
+      userEggCoins={eggCoins}
+      onClanJoined={(clanId, cost) => {
+        setUserClanId(clanId);
+        setEggCoins(prev => Math.max(0, prev - cost));
+        reloadUser();
+      }}
+    />
+  ), [isClanOpen, session?.user?.email, userClanId, eggCoins]);
+
+  const dailySpinModalNode = useMemo(() => session ? (
+    <DailySpinModal
+      isOpen={isDailySpinOpen}
+      onClose={() => setIsDailySpinOpen(false)}
+      onSpinResult={(prize) => {}}
+      userId={session?.user?.email || ''}
+      token={cachedToken.current || ''}
+      forceRefresh={reloadUser}
+      inventory={inventory}
+    />
+  ) : null, [session, isDailySpinOpen, inventory]);
+
   if (status === 'authenticated' && !isUserLoaded) {
     return (
-      <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center relative overflow-hidden">
+      <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center relative overflow-hidden px-4">
         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:40px_40px] pointer-events-none" />
-        <div className="z-10 flex flex-col items-center gap-6">
-          <Loader2 className="w-16 h-16 text-pink-500 animate-spin drop-shadow-[0_0_15px_rgba(236,72,153,0.8)]" />
-          <h2 className="text-2xl font-black text-white uppercase tracking-widest animate-pulse">Sincronizando Estado...</h2>
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-pink-900/20 via-slate-950 to-slate-950 pointer-events-none" />
+        
+        <div className="z-10 flex flex-col items-center gap-8 md:gap-10">
+          <motion.div
+            animate={{ y: [0, -20, 0] }}
+            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+            className="relative w-64 h-64 md:w-96 md:h-96 drop-shadow-[0_0_40px_rgba(236,72,153,0.4)]"
+          >
+            <Image
+              src="/splash.webp"
+              alt="EggClick Logo"
+              fill
+              className="object-contain"
+              priority
+            />
+          </motion.div>
+
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="w-8 h-8 md:w-10 md:h-10 text-pink-500 animate-spin drop-shadow-[0_0_15px_rgba(236,72,153,0.8)]" />
+            <h2 className="text-xs md:text-sm font-bold text-white/60 uppercase tracking-[0.2em] animate-pulse text-center">
+              Sincronizando con el servidor...
+            </h2>
+          </div>
         </div>
       </div>
     );
@@ -619,6 +687,9 @@ export default function GamePage() {
       {/* Efecto de cuadrícula de fondo */}
       <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:40px_40px] pointer-events-none" />
       <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-slate-950 pointer-events-none" />
+      
+      {/* Partículas de calor ascendentes basadas en los clics */}
+      <HeatParticles sessionClicks={sessionClicks} isEggBroken={isEggBroken} />
 
       {/* Botón de Clan (Esquina Superior Izquierda) - Oculto en Móvil */}
       <div className="absolute top-6 left-8 z-50 hidden md:flex items-center gap-3 origin-top-left">
@@ -646,10 +717,16 @@ export default function GamePage() {
 
       {/* Logo Central (Esquina Superior Centro) */}
       <div className="absolute top-6 left-1/2 -translate-x-1/2 z-40 hidden sm:flex flex-col items-center pointer-events-none">
-        <h1 className="text-2xl md:text-3xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 via-orange-400 to-red-500 drop-shadow-[0_4px_10px_rgba(249,115,22,0.8)] pr-2">
-          EGGCLICK
-        </h1>
-        <div className="w-1/2 h-px bg-gradient-to-r from-transparent via-orange-500 to-transparent mt-1"></div>
+        <div className="relative w-56 h-16 md:w-72 md:h-20 drop-shadow-[0_0_15px_rgba(236,72,153,0.5)]">
+          <Image
+            src="/logo%20texto.webp"
+            alt="EggClick Text Logo"
+            fill
+            sizes="(max-width: 768px) 100vw, 300px"
+            className="object-contain"
+            priority
+          />
+        </div>
       </div>
 
       {/* Menú de Usuario (Esquina Superior Derecha) - Oculto en Móvil */}
@@ -849,7 +926,7 @@ export default function GamePage() {
 
             {/* Prize Pool ajustado */}
             <div className="scale-95 origin-center">
-              <PrizePool baseUsdAmount={baseUsdPrize} userCountry={userCountry} />
+              {prizePoolNode}
             </div>
 
           </div>
@@ -1197,45 +1274,10 @@ export default function GamePage() {
 
       </div>
 
-      <StorePanel
-        isOpen={isStoreOpen}
-        onClose={handleCloseStore}
-        userCountry={userCountry}
-        eggCoins={eggCoins}
-      />
-
-      <LeaderboardPanel
-        isOpen={isLeaderboardOpen}
-        onClose={handleCloseLeaderboard}
-      />
-
-      <ClanModal
-        isOpen={isClanOpen}
-        onClose={handleCloseClan}
-        userId={session?.user?.email || ''}
-        userClanId={userClanId}
-        userEggCoins={eggCoins}
-        onClanJoined={(clanId, cost) => {
-          setUserClanId(clanId);
-          setEggCoins(prev => Math.max(0, prev - cost));
-          reloadUser();
-        }}
-      />
-
-      {session && (
-        <DailySpinModal
-          isOpen={isDailySpinOpen}
-          onClose={closeDailySpin}
-          onSpinResult={(prize) => {
-            // El backend ya sumó el premio automáticamente y se sincronizó vía WS.
-            // No sumamos manualmente para evitar duplicar el premio temporalmente.
-          }}
-          userId={session?.user?.email || ''}
-          token={cachedToken.current || ''}
-          forceRefresh={reloadUser}
-          inventory={inventory}
-        />
-      )}
+      {storePanelNode}
+      {leaderboardPanelNode}
+      {clanModalNode}
+      {dailySpinModalNode}
 
       {/* MODAL DE HUEVO ROTO PREMIUM (REDISEÑADO) */}
       <AnimatePresence>

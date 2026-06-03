@@ -59,28 +59,28 @@ export default function EggTemperaturePanel({
     return currentActiveTemp;
   }, [sessionClicks, cooldownTime, timeSinceLastClick, inactivityTimeLimit, phase, thresholds]);
 
-  // Color dinámico según la temperatura
-  const getColor = (temp: number) => {
-    if (temp >= 100) return 'text-red-500 drop-shadow-[0_0_15px_rgba(239,68,68,1)]';
-    if (temp > 85) return 'text-orange-500 drop-shadow-[0_0_10px_rgba(249,115,22,0.8)]';
-    if (temp > 50) return 'text-yellow-400 drop-shadow-[0_0_10px_rgba(250,204,21,0.6)]';
-    if (temp > 20) return 'text-cyan-300 drop-shadow-[0_0_8px_rgba(103,232,249,0.5)]';
-    return 'text-blue-300 drop-shadow-[0_0_5px_rgba(147,197,253,0.3)]';
+  const heatPercentage = ((sessionClicks % 200) / 200) * 100;
+
+  // Color dinámico sincronizado con el Huevo
+  const getColor = () => {
+    if (cooldownTime > 0 || heatPercentage >= 75) return 'text-red-500 drop-shadow-[0_0_15px_rgba(239,68,68,1)]';
+    if (heatPercentage >= 50) return 'text-orange-500 drop-shadow-[0_0_10px_rgba(249,115,22,0.8)]';
+    if (heatPercentage >= 25) return 'text-yellow-400 drop-shadow-[0_0_10px_rgba(250,204,21,0.6)]';
+    return 'text-pink-400 drop-shadow-[0_0_8px_rgba(236,72,153,0.5)]';
   };
 
-  const getBgColor = (temp: number) => {
-    if (temp >= 100) return 'bg-red-500/20 border-red-500/50 shadow-[0_0_30px_rgba(239,68,68,0.3)]';
-    if (temp > 85) return 'bg-orange-500/20 border-orange-500/40 shadow-[0_0_20px_rgba(249,115,22,0.2)]';
-    if (temp > 50) return 'bg-yellow-500/10 border-yellow-500/30 shadow-[0_0_15px_rgba(250,204,21,0.1)]';
-    if (temp > 20) return 'bg-cyan-500/10 border-cyan-500/20';
-    return 'bg-slate-900/80 border-slate-700 shadow-xl';
+  const getBgColor = () => {
+    if (cooldownTime > 0 || heatPercentage >= 75) return 'bg-red-500/20 border-red-500/50 shadow-[0_0_30px_rgba(239,68,68,0.3)]';
+    if (heatPercentage >= 50) return 'bg-orange-500/20 border-orange-500/40 shadow-[0_0_20px_rgba(249,115,22,0.2)]';
+    if (heatPercentage >= 25) return 'bg-yellow-500/10 border-yellow-500/30 shadow-[0_0_15px_rgba(250,204,21,0.1)]';
+    return 'bg-pink-500/10 border-pink-500/30 shadow-[0_0_15px_rgba(236,72,153,0.1)]';
   };
 
   return (
     <motion.div
       initial={{ y: 20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
-      className={`fixed bottom-[2.5rem] left-4 right-4 md:left-auto md:bottom-8 md:right-8 flex flex-row md:flex-row items-center md:items-stretch justify-between md:justify-start gap-2 md:gap-4 p-3 md:p-6 rounded-2xl md:rounded-3xl backdrop-blur-xl border ${getBgColor(temperature)} transition-all duration-500 z-[45]`}
+      className={`fixed bottom-[2.5rem] left-4 right-4 md:left-auto md:bottom-8 md:right-8 flex flex-row md:flex-row items-center md:items-stretch justify-between md:justify-start gap-2 md:gap-4 p-3 md:p-6 rounded-2xl md:rounded-3xl backdrop-blur-xl border ${getBgColor()} transition-all duration-500 z-[45]`}
     >
       {/* Indicadores de Fuego */}
       <div className="flex flex-row md:flex-col-reverse justify-between gap-1 md:border-r border-white/10 md:pr-5 py-1">
@@ -91,7 +91,7 @@ export default function EggTemperaturePanel({
           return (
             <Flame
               key={i}
-              className={`w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 transition-all duration-500 ${isLit ? getColor(temperature) : 'text-slate-700/30'} ${isPulsing ? 'animate-pulse scale-125' : ''}`}
+              className={`w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7 transition-all duration-500 ${isLit ? getColor() : 'text-slate-700/30'} ${isPulsing ? 'animate-pulse scale-125' : ''}`}
             />
           );
         })}
@@ -111,17 +111,17 @@ export default function EggTemperaturePanel({
             key={Math.floor(temperature)}
             initial={{ scale: 1.1, opacity: 0.8 }}
             animate={{ scale: 1, opacity: 1 }}
-            className={`text-3xl sm:text-4xl md:text-7xl font-black tabular-nums tracking-tighter ${getColor(temperature)} transition-all duration-300 drop-shadow-[0_4px_15px_rgba(0,0,0,0.6)]`}
+            className={`text-3xl sm:text-4xl md:text-7xl font-black tabular-nums tracking-tighter ${getColor()} transition-all duration-300 drop-shadow-[0_4px_15px_rgba(0,0,0,0.6)]`}
             style={{ WebkitTextStroke: temperature >= 85 ? '1px rgba(255,255,255,0.2)' : 'none' }}
           >
             {temperature.toFixed(1)}
           </motion.span>
-          <span className={`text-xl md:text-2xl font-black mb-1 md:mb-2 ${getColor(temperature)} drop-shadow-[0_2px_5px_rgba(0,0,0,0.8)]`}>°C</span>
+          <span className={`text-xl md:text-2xl font-black mb-1 md:mb-2 ${getColor()} drop-shadow-[0_2px_5px_rgba(0,0,0,0.8)]`}>°C</span>
         </div>
 
         <div className="hidden md:block w-full mt-2 h-3 bg-black/60 rounded-full overflow-hidden relative shadow-[inset_0_2px_4px_rgba(0,0,0,0.8)]">
           <motion.div
-            className={`h-full ${temperature >= 100 ? 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,1)]' : temperature > 85 ? 'bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,1)]' : temperature > 50 ? 'bg-yellow-400' : 'bg-cyan-400'}`}
+            className={`h-full ${cooldownTime > 0 || heatPercentage >= 75 ? 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,1)]' : heatPercentage >= 50 ? 'bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,1)]' : heatPercentage >= 25 ? 'bg-yellow-400 shadow-[0_0_10px_rgba(250,204,21,1)]' : 'bg-pink-400 shadow-[0_0_10px_rgba(236,72,153,1)]'}`}
             initial={{ width: `${Math.min(100, Math.max(0, temperature))}%` }}
             animate={{ width: `${Math.min(100, Math.max(0, temperature))}%` }}
             transition={{ ease: "linear", duration: 0.5 }}

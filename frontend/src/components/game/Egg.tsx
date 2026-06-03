@@ -24,34 +24,117 @@ interface EggProps {
 }
 
 export default function Egg({ onEggClick, sessionClicks = 0, cooldownTime = 0, isFrozen = false, freezeTimeLeft = 0, isAutoclicking = false, localMartillo, localHamAss, localTouchMe, setIsHolding, inventory = {}, autoClickTrigger = 0, resetCooldown, userId = 'anon_user', showOverheatWarning = false, isEggBroken = false }: EggProps) {
-  const [wobble, setWobble] = useState(false);
-  const [cracks, setCracks] = useState<{ id: number; x: number; y: number }[]>([]);
-  const [floatingTexts, setFloatingTexts] = useState<{ id: number; x: number; y: number; text: string; type?: string }[]>([]);
+  const floatingContainerRef = useRef<HTMLDivElement>(null);
+  const eggVisualRef = useRef<HTMLDivElement>(null);
   const [isHoldingLocal, setIsHoldingLocal] = useState(false);
-  const clickSoundRef = useRef<HTMLAudioElement | null>(null);
+  const [isIdle, setIsIdle] = useState(true);
+  const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const audioPool = useRef<HTMLAudioElement[]>([]);
+  const poolIndex = useRef(0);
+
+  const resetIdleTimer = () => {
+    setIsIdle(false);
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    idleTimerRef.current = setTimeout(() => setIsIdle(true), 3000);
+  };
 
   useEffect(() => {
-    clickSoundRef.current = new Audio('/sounds/huevo.mp3');
-    clickSoundRef.current.volume = 0.5;
+    resetIdleTimer();
+    return () => {
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    // Pre-allocate an audio pool to prevent massive memory leaks and lag from cloning
+    if (typeof window !== 'undefined') {
+      const pool: HTMLAudioElement[] = [];
+      for (let i = 0; i < 5; i++) {
+        const audio = new Audio('/sounds/huevo.mp3');
+        audio.volume = 0.5;
+        pool.push(audio);
+      }
+      audioPool.current = pool;
+    }
   }, []);
 
   const playClickSound = () => {
-    if (!clickSoundRef.current) return;
-    const clone = clickSoundRef.current.cloneNode() as HTMLAudioElement;
-    clone.volume = 0.5;
-    clone.play().catch(() => { });
+    if (audioPool.current.length === 0) return;
+    const audio = audioPool.current[poolIndex.current];
+    audio.currentTime = 0;
+    audio.play().catch(() => { });
+    poolIndex.current = (poolIndex.current + 1) % audioPool.current.length;
   };
   const isOverheated = cooldownTime > 0;
   const martilloUses = localMartillo !== undefined ? localMartillo : (inventory.martillo_uses || 0);
   const hamassUses = localHamAss !== undefined ? localHamAss : (inventory.hamass_uses || 0);
   const touchMeSecs = localTouchMe !== undefined ? localTouchMe : (inventory.touchme_seconds || 0);
 
+  const spawnCrack = (x: number, y: number) => {
+    if (!floatingContainerRef.current) return;
+    if (floatingContainerRef.current.querySelectorAll('.crack-element').length > 5) {
+      const first = floatingContainerRef.current.querySelector('.crack-element');
+      if (first) floatingContainerRef.current.removeChild(first);
+    }
+    const el = document.createElement('div');
+    el.className = 'absolute z-20 pointer-events-none text-white text-4xl crack-element';
+    el.style.left = `${x - 20}px`;
+    el.style.top = `${y - 20}px`;
+    el.textContent = '💥';
+    el.style.animation = 'crackFade 0.5s ease-out forwards';
+    el.addEventListener('animationend', () => {
+      if (el.parentNode === floatingContainerRef.current) floatingContainerRef.current.removeChild(el);
+    });
+    floatingContainerRef.current.appendChild(el);
+  };
+
+  const spawnFloatingText = (x: number, y: number, text: string, type: string) => {
+    if (!floatingContainerRef.current) return;
+    if (floatingContainerRef.current.querySelectorAll('.floating-text').length > 25) {
+      const first = floatingContainerRef.current.querySelector('.floating-text');
+      if (first) floatingContainerRef.current.removeChild(first);
+    }
+
+    const el = document.createElement('div');
+    let colorClass = 'text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.8)] text-3xl z-50';
+    let animationClass = 'floatTextNormal';
+    
+    if (type === 'hamass') {
+      colorClass = 'text-red-500 drop-shadow-[0_0_20px_rgba(239,68,68,1)] text-5xl z-[60] scale-150';
+      animationClass = 'floatTextHamass';
+    } else if (type === 'martillo') {
+      colorClass = 'text-yellow-400 drop-shadow-[0_0_10px_rgba(250,204,21,0.8)] text-4xl z-50';
+    } else if (type === 'touchme') {
+      colorClass = 'text-fuchsia-400 drop-shadow-[0_0_10px_rgba(232,121,249,0.8)] text-3xl z-50';
+    }
+
+    el.className = `absolute font-black pointer-events-none floating-text ${colorClass} will-change-transform`;
+    el.style.left = `${x - 20}px`;
+    el.style.top = `${y - 20}px`;
+    el.textContent = text;
+    el.style.animation = `${animationClass} ${type === 'hamass' ? '1s' : '0.8s'} ease-out forwards`;
+
+    el.addEventListener('animationend', () => {
+      if (el.parentNode === floatingContainerRef.current) floatingContainerRef.current.removeChild(el);
+    });
+
+    floatingContainerRef.current.appendChild(el);
+  };
+
+  const triggerWobble = () => {
+    if (eggVisualRef.current) {
+      eggVisualRef.current.classList.remove('animate-wobble');
+      void eggVisualRef.current.offsetWidth; // force reflow
+      eggVisualRef.current.classList.add('animate-wobble');
+    }
+  };
+
   useEffect(() => {
     if (autoClickTrigger > 0 && !isOverheated) {
       if (typeof document !== 'undefined' && !document.hidden) {
         playClickSound();
-        setWobble(true);
-        setTimeout(() => setWobble(false), 150);
+        triggerWobble();
+        resetIdleTimer();
 
         const rectWidth = 250;
         const rectHeight = 300;
@@ -59,12 +142,12 @@ export default function Egg({ onEggClick, sessionClicks = 0, cooldownTime = 0, i
         const y = rectHeight / 2 + (Math.random() * 80 - 40);
 
         if (martilloUses > 0 || hamassUses > 0) {
-          setCracks(prev => [...prev.slice(-4), { id: Date.now() + Math.random(), x, y }]);
+          spawnCrack(x, y);
         }
 
         const powerText = hamassUses > 0 ? "+100" : martilloUses > 0 ? "+5" : "+1";
         const type = hamassUses > 0 ? "hamass" : martilloUses > 0 ? "martillo" : "normal";
-        setFloatingTexts(prev => [...prev.slice(-19), { id: Date.now() + Math.random(), x, y, text: powerText, type }]);
+        spawnFloatingText(x, y, powerText, type);
       }
     }
   }, [autoClickTrigger, isOverheated, martilloUses, hamassUses]);
@@ -76,15 +159,14 @@ export default function Egg({ onEggClick, sessionClicks = 0, cooldownTime = 0, i
         onEggClick(true);
         counter++;
         if (counter % 3 === 0) playClickSound();
-        setWobble(true);
-        setTimeout(() => setWobble(false), 20);
+        triggerWobble();
 
         const rectWidth = 250;
         const rectHeight = 325;
         const x = rectWidth / 2 + (Math.random() * 80 - 40);
         const y = rectHeight / 2 + (Math.random() * 80 - 40);
 
-        setFloatingTexts(prev => [...prev.slice(-29), { id: Date.now() + Math.random(), x, y, text: "⚡", type: "touchme" }]);
+        spawnFloatingText(x, y, "⚡", "touchme");
       }, 50); // 20 clics por segundo
       return () => clearInterval(timer);
     }
@@ -105,28 +187,53 @@ export default function Egg({ onEggClick, sessionClicks = 0, cooldownTime = 0, i
     if (isOverheated) return;
 
     playClickSound();
-
-    setWobble(true);
-    setTimeout(() => setWobble(false), 150);
+    resetIdleTimer();
+    // Wobble is naturally handled by framer motion whileTap, no need for DOM manipulation here
 
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
     if (martilloUses > 0 || hamassUses > 0) {
-      setCracks(prev => [...prev.slice(-4), { id: Date.now() + Math.random(), x, y }]);
+      spawnCrack(x, y);
     }
 
     const powerText = hamassUses > 0 ? "+100" : martilloUses > 0 ? "+5" : "+1";
     const type = hamassUses > 0 ? "hamass" : martilloUses > 0 ? "martillo" : "normal";
-    setFloatingTexts(prev => [...prev.slice(-19), { id: Date.now() + Math.random(), x, y, text: powerText, type }]);
+    spawnFloatingText(x, y, powerText, type);
   };
 
   // Porcentaje de calor dinámico por fase (ciclos de 200)
   let heatPercentage = ((sessionClicks % 200) / 200) * 100;
+  
+  let rgbColor = '236, 72, 153'; // Pink base
+  let eggGradient = 'linear-gradient(to bottom, #c084fc, #ec4899, #f97316)';
+  let borderColor = '#f9a8d4';
+  let glowOpacity = 0.4;
+  let glowScale = 1;
+  
+  if (cooldownTime > 0 || heatPercentage >= 75) {
+    rgbColor = '239, 68, 68'; // Red
+    eggGradient = 'linear-gradient(to bottom, #fca5a5, #ef4444, #991b1b)';
+    borderColor = '#fca5a5';
+    glowOpacity = 0.8;
+    glowScale = 1.3;
+  } else if (heatPercentage >= 50) {
+    rgbColor = '249, 115, 22'; // Orange
+    eggGradient = 'linear-gradient(to bottom, #fdba74, #f97316, #c2410c)';
+    borderColor = '#fdba74';
+    glowOpacity = 0.6;
+    glowScale = 1.15;
+  } else if (heatPercentage >= 25) {
+    rgbColor = '250, 204, 21'; // Yellow
+    eggGradient = 'linear-gradient(to bottom, #fde047, #eab308, #a16207)';
+    borderColor = '#fde047';
+    glowOpacity = 0.5;
+    glowScale = 1.05;
+  }
 
-  const saturate = isFrozen ? 1 : isOverheated ? 1.2 : 1 + (heatPercentage / 200);
-  const brightness = isFrozen ? 1.1 : isOverheated ? 0.8 : 1;
+  const saturate = isFrozen ? 1 : isOverheated ? 1.2 : 1 + (Math.floor(heatPercentage / 25) * 25 / 200);
+  const brightness = isFrozen ? 1.1 : isOverheated ? 0.9 : 1;
   const isHeatingUp = heatPercentage > 50 && !isOverheated && !isFrozen;
   const isPhase3Wall = cooldownTime > 0; // Show AdSense as long as it is overheated
 
@@ -145,10 +252,10 @@ export default function Egg({ onEggClick, sessionClicks = 0, cooldownTime = 0, i
       )}
 
       <div
-        className={`absolute w-[250px] h-[300px] rounded-full blur-[80px] pointer-events-none transition-all duration-300 ${isPhase3Wall ? 'opacity-40' : ''}`}
+        className={`absolute w-[250px] h-[300px] rounded-full blur-[80px] pointer-events-none transition-transform duration-300 will-change-transform ${isPhase3Wall ? 'opacity-40' : ''}`}
         style={{
-          backgroundColor: isFrozen ? 'rgba(6, 182, 212, 0.8)' : isOverheated ? 'rgba(220, 38, 38, 0.9)' : `rgba(236, 72, 153, ${0.4 + (heatPercentage / 200)})`,
-          transform: isHeatingUp ? `scale(${1 + (heatPercentage / 500)})` : 'scale(1)',
+          backgroundColor: isFrozen ? 'rgba(6, 182, 212, 0.8)' : isOverheated ? 'rgba(220, 38, 38, 0.9)' : `rgba(${rgbColor}, ${glowOpacity})`,
+          transform: `translateZ(0) scale(${isOverheated ? 1.2 : glowScale})`,
           animation: isOverheated || isFrozen ? 'pulse 1s infinite' : 'none'
         }}
       ></div>
@@ -169,65 +276,70 @@ export default function Egg({ onEggClick, sessionClicks = 0, cooldownTime = 0, i
         )}
       </AnimatePresence>
 
+      <style>{`
+        @keyframes floatTextNormal {
+          0% { transform: translate(0, 0) scale(1); opacity: 1; }
+          100% { transform: translate(0, -100px) scale(1); opacity: 0; }
+        }
+        @keyframes floatTextHamass {
+          0% { transform: translate(0, 0) scale(1); opacity: 1; }
+          100% { transform: translate(0, -150px) scale(1); opacity: 0; }
+        }
+        @keyframes crackFade {
+          0% { transform: scale(0.5); opacity: 1; }
+          100% { transform: scale(2); opacity: 0; }
+        }
+        @keyframes eggWobble {
+          0%, 100% { transform: rotate(0deg); }
+          25% { transform: rotate(-5deg); }
+          75% { transform: rotate(5deg); }
+        }
+        .animate-wobble {
+          animation: eggWobble 0.15s ease-in-out;
+        }
+        @keyframes idleShake {
+          0%, 20%, 100% { transform: rotate(0deg); }
+          2%, 6%, 10%, 14%, 18% { transform: rotate(-3deg); }
+          4%, 8%, 12%, 16% { transform: rotate(3deg); }
+        }
+        .animate-idle-shake {
+          animation: idleShake 5s ease-in-out infinite;
+          transform-origin: bottom center;
+        }
+      `}</style>
+
+      {/* Contenedor Vanilla DOM para partículas flotantes */}
+      <div ref={floatingContainerRef} className="absolute inset-0 pointer-events-none z-50"></div>
+
       <motion.div
+        ref={eggVisualRef}
         whileHover={!isOverheated && !isPhase3Wall ? { scale: 1.05 } : {}}
         whileTap={!isOverheated && !isPhase3Wall ? { scale: 0.9 } : {}}
         animate={
           isOverheated
             ? { x: [-5, 5, -5, 5, 0], transition: { repeat: Infinity, duration: 0.4 } }
-            : wobble
-              ? { rotate: [-5, 5, -5, 5, 0], transition: { duration: 0.15 } }
-              : {}
+            : {}
         }
-        transition={{ duration: 0.1 }}
         onClick={handleClick}
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerUp}
         onPointerCancel={handlePointerUp}
         onContextMenu={(e) => e.preventDefault()}
-        className={`z-10 select-none relative ${(isOverheated || isPhase3Wall) ? 'cursor-not-allowed opacity-90' : 'cursor-pointer'} touch-none`}
-      >
-        {floatingTexts.map(ft => {
-          let textColorClass = 'text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.8)] text-3xl z-50';
-          if (ft.type === 'hamass') {
-            textColorClass = 'text-red-500 drop-shadow-[0_0_20px_rgba(239,68,68,1)] text-5xl z-[60]';
-          } else if (ft.type === 'martillo') {
-            textColorClass = 'text-yellow-400 drop-shadow-[0_0_10px_rgba(250,204,21,0.8)] text-4xl z-50';
-          } else if (ft.type === 'touchme') {
-            textColorClass = 'text-fuchsia-400 drop-shadow-[0_0_10px_rgba(232,121,249,0.8)] text-3xl z-50';
-          }
-          return (
-            <motion.div
-              key={ft.id}
-              initial={{ opacity: 1, x: ft.x - 20, y: ft.y - 20, scale: ft.type === 'hamass' ? 1.5 : 1 }}
-              animate={{ opacity: 0, y: ft.y - (ft.type === 'hamass' ? 150 : 120), scale: 1 }}
-              transition={{ duration: ft.type === 'hamass' ? 1 : 0.8, ease: "easeOut" }}
-              className={`absolute font-black pointer-events-none ${textColorClass}`}
-            >
-              {ft.text}
-            </motion.div>
-          );
-        })}
-
-
-        <div
-          className="rounded-[50%_50%_50%_50%/60%_60%_40%_40%] shadow-[0_0_50px_rgba(236,72,153,0.8)] border-4 flex items-center justify-center relative overflow-hidden transition-all duration-100"
+        className={`z-10 select-none relative ${(isOverheated || isPhase3Wall) ? 'cursor-not-allowed opacity-90' : 'cursor-pointer'} touch-none ${isIdle && !isOverheated && !isPhase3Wall ? 'animate-idle-shake' : ''}`}
+      >        <div
+          className="rounded-[50%_50%_50%_50%/60%_60%_40%_40%] border-4 flex items-center justify-center relative overflow-hidden transition-transform will-change-transform"
           style={{
             width: 'clamp(180px, 42vw, 250px)',
             height: 'clamp(230px, 52vw, 325px)',
-            background: isFrozen ? 'linear-gradient(to bottom, #a5f3fc, #06b6d4, #0891b2)' : isOverheated ? 'linear-gradient(to bottom, #fca5a5, #ef4444, #b91c1c)' : 'linear-gradient(to bottom, #c084fc, #ec4899, #f97316)',
-            borderColor: isFrozen ? '#cffafe' : isOverheated ? '#f87171' : '#f9a8d4',
+            background: isFrozen ? 'linear-gradient(to bottom, #a5f3fc, #06b6d4, #0891b2)' : isOverheated ? 'linear-gradient(to bottom, #fca5a5, #ef4444, #b91c1c)' : eggGradient,
+            borderColor: isFrozen ? '#cffafe' : isOverheated ? '#f87171' : borderColor,
+            boxShadow: `0 0 50px rgba(${rgbColor}, 0.8)`,
             filter: `saturate(${saturate}) brightness(${brightness})`,
           }}
         >
 
-          {!isFrozen && !isOverheated && (
-            <div
-              className="absolute inset-0 bg-red-600 mix-blend-overlay transition-opacity duration-300 pointer-events-none"
-              style={{ opacity: heatPercentage / 100 }}
-            />
-          )}
+
           <div className="absolute top-4 left-6 w-12 h-16 bg-white rounded-full blur-md opacity-30 transform rotate-12 pointer-events-none"></div>
 
           {isFrozen && (
@@ -244,18 +356,7 @@ export default function Egg({ onEggClick, sessionClicks = 0, cooldownTime = 0, i
             </div>
           )}
 
-          {cracks.map(crack => (
-            <motion.div
-              key={crack.id}
-              initial={{ opacity: 1, scale: 0.5 }}
-              animate={{ opacity: 0, scale: 2 }}
-              transition={{ duration: 0.5, ease: "easeOut" }}
-              className="absolute z-20 pointer-events-none text-white text-4xl"
-              style={{ left: crack.x - 20, top: crack.y - 20 }}
-            >
-              💥
-            </motion.div>
-          ))}
+
 
           {isOverheated && (
             <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center backdrop-blur-sm z-20">
