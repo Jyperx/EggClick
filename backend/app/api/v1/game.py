@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.api.v1.deps import get_current_user_id
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy import func
 from app.db.database import get_db
 from app.db.redis import redis_client
 from app.models.game import GlobalGameState
@@ -217,8 +218,12 @@ async def update_user_profile(user_id: str, data: ProfileUpdate, db: AsyncSessio
         user.country = data.country
 
     if data.username:
-        # Check if username exists (excluding self)
-        existing = await db.execute(select(User).where(User.username == data.username, User.id != user_id))
+        # Check if username exists (excluding self), case-insensitive
+        existing = await db.execute(
+            select(User)
+            .where(func.lower(User.username) == func.lower(data.username))
+            .where(User.id != user_id)
+        )
         if existing.scalars().first():
             # Get all taken usernames to avoid suggesting them
             all_users = await db.execute(select(User.username))
@@ -226,7 +231,13 @@ async def update_user_profile(user_id: str, data: ProfileUpdate, db: AsyncSessio
             suggestions = generate_suggestions(data.username, taken)
             return {"status": "error", "message": "Username already taken", "suggestions": suggestions}
         user.username = data.username
+        
     await db.commit()
+    
+    # Update Redis cache so the new username is used in events/clicks immediately
+    if data.username:
+        await redis_client.hset(f"user_state:{user_id}", "username", data.username)
+        
     return {"status": "success", "country": user.country, "username": user.username}
 
 def _sync_spin_state(inv, current_date_str):
