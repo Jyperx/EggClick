@@ -152,8 +152,6 @@ async def get_user_state(user_id: str, db: AsyncSession = Depends(get_db)):
     if time_since_last_click > get_inactivity_timeout(session_clicks):
         session_clicks = 0
 
-    is_banned = await redis_client.sismember("banned_users", user_id)
-
     return {
         "username": user.username,
         "egg_coins": personal_coins, 
@@ -166,8 +164,7 @@ async def get_user_state(user_id: str, db: AsyncSession = Depends(get_db)):
         "session_clicks": session_clicks,
         "cooldown_time": cooldown_time,
         "time_since_last_click": time_since_last_click,
-        "total_clicks": total_clicks,
-        "is_banned": bool(is_banned)
+        "total_clicks": total_clicks
     }
 
 import random

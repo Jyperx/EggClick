@@ -65,7 +65,6 @@ export default function GamePage() {
   const [inventory, setInventory] = useState<Record<string, any>>({});
   const [isUserLoaded, setIsUserLoaded] = useState(false);
   const [isMultiTabBlocked, setIsMultiTabBlocked] = useState(false);
-  const [isBanned, setIsBanned] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const handleAdComplete = async () => {
     setShowAdModal(false);
@@ -225,7 +224,6 @@ export default function GamePage() {
               setShowCountryModal(true);
             }
             if (data.inventory) setInventory(data.inventory);
-            if (data.is_banned) setIsBanned(true);
 
             syncServerState(data.session_clicks || 0, data.cooldown_time || 0, data.time_since_last_click || 0);
             setIsUserLoaded(true);
@@ -364,15 +362,6 @@ export default function GamePage() {
 
           if (data.type === 'force_disconnect' && data.reason === 'multiple_tabs') {
             setIsMultiTabBlocked(true);
-            if (userWsRef.current) {
-              userWsRef.current.onclose = null;
-              userWsRef.current.close();
-            }
-            return;
-          }
-
-          if (data.type === 'banned') {
-            setIsBanned(true);
             if (userWsRef.current) {
               userWsRef.current.onclose = null;
               userWsRef.current.close();
@@ -1197,33 +1186,6 @@ export default function GamePage() {
                 Preparando la nueva temporada...
               </motion.p>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* MODAL DE CUENTA BANEADA */}
-      <AnimatePresence>
-        {isBanned && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="fixed inset-0 z-[999] flex items-center justify-center bg-black/95 p-4 backdrop-blur-md"
-          >
-            <div className="relative w-full max-w-lg bg-red-950/80 border-2 border-red-500 rounded-3xl p-8 flex flex-col items-center shadow-[0_0_50px_rgba(239,68,68,0.3)] text-center">
-              <div className="text-6xl mb-4">⛔</div>
-              <h2 className="text-3xl md:text-4xl font-black text-red-500 uppercase tracking-widest mb-4">
-                CUENTA BANEADA
-              </h2>
-              <p className="text-red-200/80 text-lg mb-6">
-                Tu cuenta ha sido suspendida permanentemente por violar los términos del servicio o utilizar herramientas no autorizadas.
-              </p>
-              <button
-                onClick={() => signOut()}
-                className="px-8 py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl transition-colors uppercase tracking-wider shadow-lg"
-              >
-                Cerrar Sesión
-              </button>
-            </div>
           </motion.div>
         )}
       </AnimatePresence>

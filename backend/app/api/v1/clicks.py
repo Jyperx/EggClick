@@ -56,7 +56,7 @@ async def register_clicks(
     if not user_id and batch.jwt_token:
         import jwt
         import os
-        secret = os.environ["JWT_SECRET"]
+        secret = os.getenv("JWT_SECRET", "super-secret-key-egg-game")
         try:
             decoded = jwt.decode(batch.jwt_token, secret, algorithms=["HS256"])
             user_id = decoded.get("sub")
@@ -82,7 +82,7 @@ async def beacon_clicks(request: Request, db: AsyncSession = Depends(get_db)):
     if batch.jwt_token:
         import jwt
         import os
-        secret = os.environ["JWT_SECRET"]
+        secret = os.getenv("JWT_SECRET", "super-secret-key-egg-game")
         try:
             decoded = jwt.decode(batch.jwt_token, secret, algorithms=["HS256"])
             user_id = decoded.get("sub")
@@ -165,7 +165,7 @@ async def process_click_batch(batch: ClickBatch, user_id: str, db: AsyncSession)
     if hasattr(batch, 'bypass_cooldown_token') and batch.bypass_cooldown_token:
         try:
             import jwt, os
-            secret = os.environ["JWT_SECRET"]
+            secret = os.getenv("JWT_SECRET", "super-secret-key-egg-game")
             decoded = jwt.decode(batch.bypass_cooldown_token, secret, algorithms=["HS256"])
             if decoded.get("sub") == "adsense_reward": bypass_cooldown = True
         except Exception: pass
@@ -229,20 +229,9 @@ async def process_click_batch(batch: ClickBatch, user_id: str, db: AsyncSession)
     if last_activity_iso:
         try:
             last_act = datetime.datetime.fromisoformat(last_activity_iso)
-            max_physical_seconds = max(1.0, (now - last_act).total_seconds() + 1.0)
+            max_physical_seconds = max(2.0, (now - last_act).total_seconds() + 1.0)
         except Exception:
             pass
-
-    # Lógica Anti-Bot estricta: Validar que el volumen de clics sea humanamente posible
-    # Límite: 30 clics por segundo (bastante generoso).
-    max_human_cps = 30
-    max_allowed_manual_clicks = int(max_physical_seconds * max_human_cps)
-    total_requested = batch.clicks + batch.frozen_clicks
-    if total_requested > max_allowed_manual_clicks:
-        if total_requested > 0:
-            ratio = max_allowed_manual_clicks / total_requested
-            batch.clicks = int(batch.clicks * ratio)
-            batch.frozen_clicks = int(batch.frozen_clicks * ratio)
 
     inventory["last_click_at"] = now.isoformat()
     
@@ -265,14 +254,13 @@ async def process_click_batch(batch: ClickBatch, user_id: str, db: AsyncSession)
             
     used_ice_hands = getattr(batch, 'used_ice_hands', 0)
     
-    actual_ice_used = 0
     valid_frozen_clicks = 0
     if used_ice_hands > 0:
         current_ice = inventory.get("ice_hand_uses", 0)
         actual_ice = min(used_ice_hands, current_ice)
         if actual_ice > 0:
             inventory["ice_hand_uses"] -= actual_ice
-            actual_ice_used = actual_ice
+            session_clicks = 0
             valid_frozen_clicks = batch.frozen_clicks
             
     if valid_frozen_clicks == 0 and batch.frozen_clicks > 0:
@@ -336,17 +324,15 @@ async def process_click_batch(batch: ClickBatch, user_id: str, db: AsyncSession)
     session_clicks += batch.clicks + auto_clicks_pool
     
     cooldown_time = 0
+    old_thresh = get_highest_threshold(old_session)
+    new_thresh = get_highest_threshold(session_clicks)
     
-    if actual_ice_used == 0:
-        old_thresh = get_highest_threshold(old_session)
-        new_thresh = get_highest_threshold(session_clicks)
-        
-        if new_thresh > old_thresh:
-            penalty = get_cooldown_penalty(session_clicks)
-            if penalty > 0:
-                cooldown_end_calc = now + datetime.timedelta(seconds=penalty)
-                cooldown_until = cooldown_end_calc.isoformat()
-                cooldown_time = penalty
+    if new_thresh > old_thresh:
+        penalty = get_cooldown_penalty(session_clicks)
+        if penalty > 0:
+            cooldown_end_calc = now + datetime.timedelta(seconds=penalty)
+            cooldown_until = cooldown_end_calc.isoformat()
+            cooldown_time = penalty
             
     old_clicks = total_clicks
     new_coins_earned = ((old_clicks + total_added) // 10) - (old_clicks // 10)
@@ -480,6 +466,17 @@ async def skip_cooldown_ad(
         
     user_state_key = f"user_state:{token_user_id}"
     
+    # Simplemente reseteamos los session_clicks a 0 y borramos el cooldown
+    pipe = redis_client.pipeline()
+    state_updates = {
+        'session_clicks': '0',
+        'cooldown_until': ''
+    }
+    pipe.hset(user_state_key, mapping=state_updates)
+    pipe.sadd("pending_db_sync", token_user_id)
+    await pipe.execute()
+    
+    return {"status": "success", "message": "Cooldown reset from ad reward", "session_clicks": 0, "cooldown_until": ""}
     # Simplemente reseteamos los session_clicks a 0 y borramos el cooldown
     pipe = redis_client.pipeline()
     state_updates = {
