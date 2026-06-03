@@ -10,7 +10,7 @@ import EggTemperaturePanel from '@/components/game/EggTemperaturePanel';
 import FloatingNotifications, { NotificationItem } from '@/components/game/FloatingNotifications';
 import { useBatchClick } from '@/hooks/useBatchClick';
 import { CountryCode } from '@/lib/currency';
-import { ShoppingBag, Trophy, Loader2, WifiOff, Gift, X, Shield, Gamepad2, Settings, LogOut, User } from 'lucide-react';
+import { ShoppingBag, Trophy, Loader2, WifiOff, Gift, X, Shield, Gamepad2, Settings, LogOut, User, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { DailySpinModal } from '@/components/game/DailySpinModal';
 
 import { getRankInfo } from '@/lib/ranking';
@@ -71,6 +71,36 @@ export default function GamePage() {
   const [banReason, setBanReason] = useState<string | null>(null);
   const [banExpiresAt, setBanExpiresAt] = useState<string | null>(null);
   const [banTimeLeft, setBanTimeLeft] = useState<string | null>(null);
+  
+  const [isUnbannedModalOpen, setIsUnbannedModalOpen] = useState(false);
+  const [unbanCompensation, setUnbanCompensation] = useState(0);
+  const [appealMessage, setAppealMessage] = useState("");
+  const [isAppealing, setIsAppealing] = useState(false);
+  const [appealStatus, setAppealStatus] = useState<"idle" | "success" | "error">("idle");
+
+  const submitAppeal = async () => {
+    if (!appealMessage.trim()) return;
+    setIsAppealing(true);
+    setAppealStatus("idle");
+    try {
+      const res = await fetch(`${API_URL}/api/v1/game/appeal`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${cachedToken.current}`
+        },
+        body: JSON.stringify({ message: appealMessage })
+      });
+      if (res.ok) {
+        setAppealStatus("success");
+      } else {
+        setAppealStatus("error");
+      }
+    } catch {
+      setAppealStatus("error");
+    }
+    setIsAppealing(false);
+  };
 
   useEffect(() => {
     if (!isBanned || !banExpiresAt) return;
@@ -406,6 +436,17 @@ export default function GamePage() {
               userWsRef.current.onclose = null;
               userWsRef.current.close();
             }
+            return;
+          }
+
+          if (data.type === 'unbanned') {
+            setIsBanned(false);
+            setUnbanCompensation(data.compensation_coins || 0);
+            setIsUnbannedModalOpen(true);
+            reloadUser();
+            setTimeout(() => {
+              setIsUnbannedModalOpen(false);
+            }, 6000);
             return;
           }
 
@@ -1239,7 +1280,7 @@ export default function GamePage() {
             className="fixed inset-0 z-[999] flex items-center justify-center bg-black/95 p-4 backdrop-blur-md"
           >
             <div className="relative w-full max-w-lg bg-red-950/80 border-2 border-red-500 rounded-3xl p-8 flex flex-col items-center shadow-[0_0_50px_rgba(239,68,68,0.3)] text-center">
-              <div className="text-6xl mb-4">⛔</div>
+              <ShieldAlert className="w-16 h-16 text-red-500 mb-4 drop-shadow-[0_0_15px_rgba(239,68,68,0.5)]" />
               <h2 className="text-3xl md:text-4xl font-black text-red-500 uppercase tracking-widest mb-4">
                 CUENTA BANEADA
               </h2>
@@ -1247,12 +1288,36 @@ export default function GamePage() {
                 {banReason || "Tu cuenta ha sido suspendida permanentemente por violar los términos del servicio o utilizar herramientas no autorizadas."}
               </p>
               
-              <div className="bg-red-900/50 rounded-xl p-4 mb-6 border border-red-500/30 w-full">
+              <div className="bg-red-900/50 rounded-xl p-4 mb-4 border border-red-500/30 w-full">
                 <span className="block text-red-400 text-sm font-bold uppercase tracking-widest mb-1">Tiempo Restante</span>
                 <span className="block text-white text-2xl font-black tracking-wider">
                   {banExpiresAt ? (banTimeLeft || "Calculando...") : "INDEFINIDO"}
                 </span>
               </div>
+              
+              {appealStatus === "success" ? (
+                <div className="bg-green-900/50 text-green-400 border border-green-500/50 rounded-xl p-3 mb-6 w-full font-bold">
+                  ¡Apelación enviada con éxito! Espera la respuesta de los administradores.
+                </div>
+              ) : (
+                <div className="w-full mb-6 text-left">
+                  <label className="block text-red-300 text-xs font-bold uppercase mb-2 ml-1">¿Crees que fue un error? Envía una apelación:</label>
+                  <textarea 
+                    value={appealMessage}
+                    onChange={(e) => setAppealMessage(e.target.value)}
+                    placeholder="Escribe tu mensaje aquí..."
+                    className="w-full bg-black/50 border border-red-500/30 rounded-xl p-3 text-white placeholder-red-500/50 resize-none h-24 focus:outline-none focus:border-red-400 focus:ring-1 focus:ring-red-400 transition-all"
+                  />
+                  {appealStatus === "error" && <p className="text-red-400 text-xs font-bold mt-1">Hubo un error al enviar la apelación. Intenta de nuevo.</p>}
+                  <button
+                    onClick={submitAppeal}
+                    disabled={isAppealing || !appealMessage.trim()}
+                    className="mt-2 w-full px-4 py-2 bg-red-800 hover:bg-red-700 disabled:opacity-50 text-white font-bold rounded-xl transition-colors uppercase text-sm tracking-wider"
+                  >
+                    {isAppealing ? "Enviando..." : "Enviar Apelación"}
+                  </button>
+                </div>
+              )}
               
               <button
                 onClick={() => signOut()}
@@ -1260,6 +1325,38 @@ export default function GamePage() {
               >
                 Cerrar Sesión
               </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL DE DESBANEO */}
+      <AnimatePresence>
+        {isUnbannedModalOpen && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 pointer-events-none"
+          >
+            <div className="relative w-full max-w-sm bg-green-950/90 border-2 border-green-500 rounded-3xl p-8 flex flex-col items-center shadow-[0_0_50px_rgba(34,197,94,0.4)] text-center">
+              <ShieldCheck className="w-20 h-20 text-green-400 mb-4 drop-shadow-[0_0_15px_rgba(34,197,94,0.8)] animate-pulse" />
+              <h2 className="text-2xl md:text-3xl font-black text-green-400 uppercase tracking-widest mb-2">
+                ¡Cuenta Desbaneada!
+              </h2>
+              <p className="text-green-200/80 text-sm mb-4">
+                Tu cuenta ha sido reactivada. ¡Vuelve a jugar!
+              </p>
+              
+              {unbanCompensation > 0 && (
+                <div className="bg-yellow-900/40 border border-yellow-500/50 rounded-xl p-3 w-full flex flex-col items-center gap-1">
+                  <span className="text-yellow-500 text-xs font-bold uppercase">Compensación recibida</span>
+                  <div className="flex items-center gap-2">
+                    <Image src="/sprites/moneda.png" alt="Coin" width={20} height={20} className="drop-shadow-md" />
+                    <span className="text-yellow-400 font-black text-xl">+{unbanCompensation}</span>
+                  </div>
+                </div>
+              )}
             </div>
           </motion.div>
         )}

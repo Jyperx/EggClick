@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from app.api.v1.deps import get_current_user_id
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -439,3 +439,29 @@ async def buy_spins(
         return {"status": "success", "egg_coins": final_coins, "inventory": inv}
     finally:
         await redis_client.delete(lock_key)
+
+@router.post("/appeal")
+async def submit_appeal(request: Request, body: dict):
+    import jwt, os, datetime, json
+    auth = request.headers.get("Authorization")
+    if not auth or not auth.startswith("Bearer "):
+        raise HTTPException(401, "No token")
+    token = auth.split(" ")[1]
+    secret = os.getenv("JWT_SECRET", "super-secret-key-egg-game")
+    try:
+        payload = jwt.decode(token, secret, algorithms=["HS256"])
+        user_id = payload.get("sub")
+    except Exception:
+        raise HTTPException(401, "Invalid token")
+        
+    message = body.get("message", "").strip()
+    if not message:
+        raise HTTPException(400, "El mensaje no puede estar vacío")
+        
+    appeal = {
+        "user_id": user_id,
+        "message": message,
+        "timestamp": datetime.datetime.utcnow().isoformat() + "Z"
+    }
+    await redis_client.rpush("ban_appeals", json.dumps(appeal))
+    return {"status": "success", "message": "Apelación enviada correctamente"}
