@@ -7,8 +7,8 @@ class ClickBatch(BaseModel):
     frozen_clicks: int = 0
     timestamp: int # Para Anti-Replay
     used_ice_hands: Optional[int] = 0
-    used_autoclicker_seconds: Optional[int] = 0
-    used_touchme_seconds: Optional[int] = 0
+    used_autoclicker_seconds: Optional[float] = 0.0
+    used_touchme_seconds: Optional[float] = 0.0
     bypass_cooldown_token: Optional[str] = None
     device_fingerprint: Optional[str] = None
     jwt_token: Optional[str] = None

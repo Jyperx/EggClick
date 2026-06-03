@@ -126,20 +126,26 @@ export function useBatchClick(
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (isHolding && localTouchMe > 0) {
-      // Consumir 1 segundo inmediatamente para evitar exploit de clics rápidos
-      setLocalTouchMe((prev) => prev - 1);
-      usedTouchMeSecondsInBatch.current += 1;
+      const lastTouchTick = Date.now();
+      let prevTick = lastTouchTick;
 
       timer = setInterval(() => {
-        setLocalTouchMe((prev) => {
-          if (prev > 0) {
-            usedTouchMeSecondsInBatch.current += 1;
-            return prev - 1;
-          }
-          clearInterval(timer);
-          return 0;
-        });
-      }, 1000);
+        const now = Date.now();
+        const deltaSecs = (now - prevTick) / 1000;
+
+        if (deltaSecs >= 0.25) {
+          setLocalTouchMe((prev) => {
+            const actualSecs = Math.min(deltaSecs, prev);
+            if (actualSecs > 0) {
+              usedTouchMeSecondsInBatch.current += actualSecs;
+              prevTick += actualSecs * 1000;
+              return prev - actualSecs;
+            }
+            clearInterval(timer);
+            return 0;
+          });
+        }
+      }, 250);
     }
     return () => clearInterval(timer);
   }, [isHolding]);
@@ -281,9 +287,9 @@ export function useBatchClick(
 
       const timer = setInterval(() => {
         const now = Date.now();
-        const deltaSecs = Math.floor((now - lastAutoclickerTick.current) / 1000);
+        const deltaSecs = (now - lastAutoclickerTick.current) / 1000;
 
-        if (deltaSecs >= 1) {
+        if (deltaSecs >= 0.5) {
           setLocalAutoclicker((prev) => {
             const actualSecs = Math.min(deltaSecs, prev);
             if (actualSecs > 0) {
@@ -300,7 +306,7 @@ export function useBatchClick(
             return prev - actualSecs;
           });
         }
-      }, 1000);
+      }, 500);
       return () => {
         clearInterval(timer);
         setIsAutoclicking(false);
