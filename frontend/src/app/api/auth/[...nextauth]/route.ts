@@ -9,6 +9,10 @@ const handler = NextAuth({
     }),
   ],
   secret: process.env.NEXTAUTH_SECRET,
+  session: {
+    strategy: "jwt",
+    maxAge: 365 * 24 * 60 * 60, // 365 días
+  },
   callbacks: {
     async session({ session, token }) {
       if (session?.user) {

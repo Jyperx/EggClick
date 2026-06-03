@@ -13,4 +13,4 @@ python-multipart==0.0.20
 httpx==0.28.1
 psycopg2-binary==2.9.12
 aiohttp==3.12.4
-websockets  
+websockets   
