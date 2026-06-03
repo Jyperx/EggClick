@@ -382,6 +382,11 @@ async def _process_click_batch_core(batch: ClickBatch, user_id: str, db: AsyncSe
     pipe.hset(user_state_key, mapping=state_updates)
     pipe.hincrby(user_state_key, "total_clicks", total_added)
     
+    current_season = await redis_client.get("global_egg_current_season")
+    if current_season:
+        season_str = current_season.decode("utf-8") if isinstance(current_season, bytes) else current_season
+        pipe.zincrby(f"season_leaderboard:{season_str}", total_added, user_id)
+        
     pipe.sadd("pending_db_sync", user_id)
     
     # --- LÓGICA ATÓMICA DE RUPTURA DEL HUEVO ---
@@ -397,10 +402,61 @@ async def _process_click_batch_core(batch: ClickBatch, user_id: str, db: AsyncSe
             await redis_client.set("global_egg_status", "broken")
             winner_name = state.get("username", user_id.split('@')[0])
             await redis_client.set("global_egg_winner", winner_name)
-            prize_usd = await redis_client.get("global_egg_prize_usd")
+            prize_usd_str = await redis_client.get("global_egg_prize_usd")
+            prize_usd = float(prize_usd_str) if prize_usd_str else 0.0
+            
+            season_mode_str = await redis_client.get("global_egg_season_mode")
+            season_mode = season_mode_str.decode('utf-8') if isinstance(season_mode_str, bytes) else (season_mode_str or "ganador_absoluto")
+            
+            # Obtener top 10 para resolver empates por rango (total_clicks)
+            current_season = await redis_client.get("global_egg_current_season")
+            season_str = current_season.decode('utf-8') if isinstance(current_season, bytes) else (current_season or "1")
+            
+            top_season = await redis_client.zrevrange(f"season_leaderboard:{season_str}", 0, 9, withscores=True)
+            
+            winners_info = []
+            for uid_bytes, score in top_season:
+                uid = uid_bytes.decode('utf-8') if isinstance(uid_bytes, bytes) else uid_bytes
+                u_state = await redis_client.hgetall(f"user_state:{uid}")
+                u_name = u_state.get(b"username", uid.encode()).decode('utf-8')
+                u_total = int(u_state.get(b"total_clicks", 0))
+                winners_info.append({"user_id": uid, "username": u_name, "season_clicks": int(score), "total_clicks": u_total, "prize": 0})
+                
+            # Ordenar por season_clicks desc, luego total_clicks desc
+            winners_info.sort(key=lambda x: (x["season_clicks"], x["total_clicks"]), reverse=True)
+            top_3 = winners_info[:3]
+            
+            # Distribuir premios
+            final_winners = []
+            if season_mode == "ganador_absoluto":
+                final_winners.append({"username": winner_name, "user_id": user_id, "reason": "Golpe final", "prize_usd": prize_usd})
+            elif season_mode == "carrera_clicks":
+                percentages = [0.50, 0.30, 0.20]
+                for i, w in enumerate(top_3):
+                    prize = prize_usd * percentages[i]
+                    final_winners.append({"username": w["username"], "user_id": w["user_id"], "reason": f"#{i+1} en clics", "prize_usd": prize})
+            elif season_mode == "el_golpe":
+                final_winners.append({"username": winner_name, "user_id": user_id, "reason": "Golpe final", "prize_usd": prize_usd * 0.50})
+                # El otro 50% se divide en 30% y 20% para los que más clics dieron (excluyendo al ganador del golpe final del 30%)
+                # Si el que dio el golpe es el 1ro, el 30% pasa al 2do, etc.
+                remaining_top = [w for w in top_3 if w["user_id"] != user_id]
+                if len(remaining_top) > 0:
+                    final_winners.append({"username": remaining_top[0]["username"], "user_id": remaining_top[0]["user_id"], "reason": "Más clics", "prize_usd": prize_usd * 0.30})
+                if len(remaining_top) > 1:
+                    final_winners.append({"username": remaining_top[1]["username"], "user_id": remaining_top[1]["user_id"], "reason": "2do más clics", "prize_usd": prize_usd * 0.20})
+            
+            # Guardar ganadores en Redis para consulta
+            winners_record = {"season": season_str, "mode": season_mode, "prize": prize_usd, "winners": final_winners}
+            await redis_client.hset("season_winners_history", season_str, json.dumps(winners_record))
             
             # Notificar a todos por WebSocket
-            msg = json.dumps({"type": "egg_broken", "winner": winner_name, "prize_usd": prize_usd})
+            msg = json.dumps({
+                "type": "egg_broken", 
+                "winner": winner_name, 
+                "prize_usd": prize_usd,
+                "season_mode": season_mode,
+                "winners": final_winners
+            })
             await redis_client.publish("global_events", msg)
             
             # Cerrar la temporada en la base de datos de inmediato

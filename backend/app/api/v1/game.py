@@ -7,6 +7,9 @@ from app.db.database import get_db
 from app.db.redis import redis_client
 from app.models.game import GlobalGameState
 from app.models.user import User
+import json
+import datetime
+from pydantic import BaseModel
 
 router = APIRouter()
 
@@ -48,6 +51,25 @@ async def get_game_state(db: AsyncSession = Depends(get_db)):
         "is_active": is_active,
         "winner": winner
     }
+
+class ContactInfoRequest(BaseModel):
+    contact_method: str
+    contact_details: str
+
+@router.post("/contact-info")
+async def save_contact_info(req: ContactInfoRequest, token_user_id: str = Depends(get_current_user_id)):
+    if not token_user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+        
+    info = {
+        "user_id": token_user_id,
+        "method": req.contact_method,
+        "details": req.contact_details,
+        "updated_at": datetime.datetime.utcnow().isoformat()
+    }
+    
+    await redis_client.hset("winners_contact_info", token_user_id, json.dumps(info))
+    return {"status": "success", "message": "Contact info saved"}
 
 @router.get("/user/{user_id}")
 async def get_user_state(user_id: str, db: AsyncSession = Depends(get_db)):

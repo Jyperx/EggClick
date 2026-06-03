@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, BigInteger, Numeric, Boolean, DateTime
+from sqlalchemy import Column, Integer, BigInteger, Numeric, Boolean, DateTime, String
 from app.models.base import Base
 
 class GlobalGameState(Base):
@@ -12,3 +12,4 @@ class GlobalGameState(Base):
     unprocessed_clicks_for_prize = Column(Integer, default=0)
     is_active = Column(Boolean, default=True)
     frenzy_mode_until = Column(DateTime, nullable=True)
+    season_mode = Column(String, default="ganador_absoluto")

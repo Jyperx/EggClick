@@ -9,7 +9,7 @@ import ClanModal from '@/components/social/ClanModal';
 import EggTemperaturePanel from '@/components/game/EggTemperaturePanel';
 import FloatingNotifications, { NotificationItem } from '@/components/game/FloatingNotifications';
 import { useBatchClick } from '@/hooks/useBatchClick';
-import { CountryCode } from '@/lib/currency';
+import { CountryCode, formatCurrency } from '@/lib/currency';
 import { ShoppingBag, Trophy, Loader2, WifiOff, Gift, X, Shield, Gamepad2, Settings, LogOut, User, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { DailySpinModal } from '@/components/game/DailySpinModal';
 
@@ -57,6 +57,14 @@ export default function GamePage() {
   const [baseUsdPrize, setBaseUsdPrize] = useState(150.00);
   const [isEggBroken, setIsEggBroken] = useState(false);
   const [eggWinner, setEggWinner] = useState<string | null>(null);
+  const [seasonMode, setSeasonMode] = useState<string>("ganador_absoluto");
+  const [showNewSeasonModal, setShowNewSeasonModal] = useState(false);
+  const [seasonWinners, setSeasonWinners] = useState<any[]>([]);
+  const [showContactForm, setShowContactForm] = useState(false);
+  const [contactMethod, setContactMethod] = useState('');
+  const [contactDetails, setContactDetails] = useState('');
+  const [contactSubmitted, setContactSubmitted] = useState(false);
+  
   const [userCountry, setUserCountry] = useState<CountryCode>('CO');
   const [showCountryModal, setShowCountryModal] = useState(false);
   const [totalClicks, setTotalClicks] = useState(0);
@@ -120,6 +128,27 @@ export default function GamePage() {
     }, 1000);
     return () => clearInterval(interval);
   }, [isBanned, banExpiresAt]);
+
+  const submitContactInfo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!contactMethod || !contactDetails) return;
+    try {
+      const res = await fetch(`${API_URL}/api/v1/game/contact-info`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${cachedToken.current}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ contact_method: contactMethod, contact_details: contactDetails })
+      });
+      if (res.ok) {
+        setContactSubmitted(true);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const handleAdComplete = async () => {
     setShowAdModal(false);
     try {
@@ -376,12 +405,19 @@ export default function GamePage() {
             setIsEggBroken(true);
             setEggWinner(data.winner);
             setGlobalClicks(globalClicksRequired);
+            setSeasonMode(data.season_mode || "ganador_absoluto");
+            setSeasonWinners(data.winners || []);
+            setShowContactForm(false);
+            setContactSubmitted(false);
           } else if (data.type === 'new_season_started') {
             setIsEggBroken(false);
             setEggWinner(null);
             setGlobalClicks(0);
             setGlobalClicksRequired(data.total_clicks);
             if (data.prize_usd) setBaseUsdPrize(data.prize_usd);
+            if (data.season_mode) setSeasonMode(data.season_mode);
+            setSeasonWinners([]);
+            setShowNewSeasonModal(true);
           }
         } catch (err) { }
       };
@@ -1198,70 +1234,148 @@ export default function GamePage() {
         />
       )}
 
-      {/* MODAL DE HUEVO ROTO PREMIUM (CON ANIMACIÓN LIGERA) */}
+      {/* MODAL DE HUEVO ROTO PREMIUM (REDISEÑADO) */}
       <AnimatePresence>
         {isEggBroken && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4"
+            className="fixed inset-0 z-[999] flex items-center justify-center bg-black/95 p-4 backdrop-blur-md"
           >
             <motion.div
               initial={{ scale: 0.8, opacity: 0, y: 50 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               transition={{ type: "spring", damping: 20, stiffness: 100 }}
-              className="relative w-full max-w-2xl bg-gradient-to-b from-slate-900 to-slate-950 border border-yellow-500/30 rounded-3xl p-8 flex flex-col items-center shadow-2xl overflow-hidden"
+              className="relative w-full max-w-2xl bg-slate-950/90 border-2 border-yellow-500 rounded-3xl p-8 flex flex-col items-center shadow-[0_0_50px_rgba(234,179,8,0.2)] overflow-hidden"
             >
-              {/* Decoración de fondo muy ligera */}
+              {/* Resplandor de fondo interno */}
               <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-yellow-500/10 via-transparent to-transparent pointer-events-none" />
 
-              {/* Animación del Huevo Roto */}
-              <motion.div
-                initial={{ rotate: -10, scale: 0.8 }}
-                animate={{
-                  rotate: [0, -10, 10, -10, 10, 0, 0],
-                  scale: [1, 1.1, 1.1, 1.1, 1.1, 1.2, 1],
-                }}
-                transition={{ duration: 1.5, ease: "easeInOut", times: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 1] }}
-                className="w-32 h-32 md:w-48 md:h-48 relative mb-6 flex items-center justify-center"
-              >
-                <span className="text-8xl md:text-9xl relative z-10 drop-shadow-xl">🍳</span>
-              </motion.div>
+              {/* Título e Icono principal condicional */}
+              {(() => {
+                const isWinner = seasonWinners.find(w => w.user_id === (session?.user?.email || 'anon_user') || w.username === username);
+                if (isWinner) {
+                  return (
+                    <>
+                      <motion.div
+                        initial={{ rotate: -10, scale: 0.8 }}
+                        animate={{ rotate: [0, -10, 10, -10, 10, 0], scale: [1, 1.1, 1] }}
+                        transition={{ duration: 1.5, ease: "easeInOut", times: [0, 0.2, 0.4, 0.6, 0.8, 1] }}
+                      >
+                        <Trophy className="w-24 h-24 text-yellow-500 mb-4 drop-shadow-[0_0_25px_rgba(234,179,8,0.8)]" />
+                      </motion.div>
+                      <h2 className="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-200 to-yellow-600 mb-2 text-center uppercase tracking-widest drop-shadow-sm">
+                        ¡ERES UN GANADOR!
+                      </h2>
+                      <p className="text-yellow-400 font-bold text-lg md:text-xl mb-6 uppercase tracking-wider bg-yellow-500/10 px-4 py-1 rounded-full border border-yellow-500/50 text-center">
+                        {isWinner.reason}
+                      </p>
+                    </>
+                  );
+                } else {
+                  return (
+                    <>
+                      <motion.div
+                        initial={{ rotate: -10, scale: 0.8 }}
+                        animate={{ rotate: [0, -10, 10, -10, 10, 0], scale: [1, 1.1, 1] }}
+                        transition={{ duration: 1.5, ease: "easeInOut", times: [0, 0.2, 0.4, 0.6, 0.8, 1] }}
+                      >
+                        <ShieldAlert className="w-20 h-20 text-yellow-500 mb-4 drop-shadow-[0_0_20px_rgba(234,179,8,0.6)]" />
+                      </motion.div>
+                      <h2 className="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-200 to-yellow-600 mb-2 text-center uppercase tracking-widest drop-shadow-sm">
+                        ¡HUEVO ROTO!
+                      </h2>
+                      <p className="text-yellow-200/80 text-lg mb-6 text-center font-medium">
+                        La temporada ha finalizado.
+                      </p>
+                    </>
+                  );
+                }
+              })()}
 
-              <motion.h2
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 1 }}
-                className="text-4xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-200 to-yellow-600 mb-2 text-center uppercase tracking-tight drop-shadow-sm"
-              >
-                ¡HUEVO ROTO!
-              </motion.h2>
+              <div className="w-full bg-slate-900/80 rounded-2xl p-6 border border-yellow-500/30 shadow-inner relative z-10 mb-6 flex flex-col items-center">
+                <span className="text-slate-400 font-black uppercase tracking-widest text-sm mb-4">TABLA DE GANADORES</span>
+                
+                {seasonWinners.length > 0 ? (
+                  <div className="w-full overflow-hidden rounded-xl border border-slate-700">
+                    <table className="w-full text-left text-sm text-slate-300">
+                      <thead className="bg-slate-800 text-slate-400 uppercase text-xs tracking-wider">
+                        <tr>
+                          <th className="px-4 py-3 font-black">Jugador</th>
+                          <th className="px-4 py-3 font-black">Posición</th>
+                          <th className="px-4 py-3 font-black text-right">Premio</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {seasonWinners.map((w, idx) => (
+                          <tr key={idx} className="border-t border-slate-700/50 hover:bg-slate-700/30 transition-colors">
+                            <td className="px-4 py-4 font-bold text-white text-base">{w.username}</td>
+                            <td className="px-4 py-4 text-xs font-semibold text-yellow-500">{w.reason.toUpperCase()}</td>
+                            <td className="px-4 py-4 text-right font-black text-green-400 text-base">${w.prize_usd.toFixed(2)} USD</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center w-full">
+                    <span className="text-3xl md:text-5xl font-black text-white truncate block">
+                      {eggWinner || 'Desconocido'}
+                    </span>
+                  </div>
+                )}
+              </div>
 
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 1.5 }}
-                className="text-lg md:text-xl text-slate-400 text-center mb-8 flex flex-col items-center gap-3 w-full"
-              >
-                <span className="tracking-widest uppercase text-xs font-bold text-slate-500">El ganador absoluto es:</span>
-                <motion.div
-                  initial={{ scale: 0.5 }}
-                  animate={{ scale: 1 }}
-                  transition={{ delay: 1.8, type: "spring" }}
-                  className="w-full max-w-sm px-6 py-4 bg-slate-800/50 rounded-2xl border border-slate-700 shadow-inner"
+              {seasonWinners.some(w => w.user_id === (session?.user?.email || 'anon_user') || w.username === username) && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 1.0 }}
+                  className="w-full mb-6 p-5 bg-green-950/40 border-2 border-green-500/50 rounded-2xl relative z-10 shadow-[0_0_20px_rgba(34,197,94,0.1)]"
                 >
-                  <span className="text-3xl md:text-5xl font-black text-white truncate block">
-                    {eggWinner || 'Desconocido'}
-                  </span>
+                  <h3 className="text-green-400 font-black mb-3 text-center uppercase tracking-widest">Reclama tu premio</h3>
+                  {contactSubmitted ? (
+                    <div className="text-center font-bold text-green-300 bg-green-900/40 p-3 rounded-lg border border-green-500/30">
+                      ¡Datos enviados! Nos pondremos en contacto contigo pronto.
+                    </div>
+                  ) : (
+                    <form onSubmit={submitContactInfo} className="flex flex-col gap-4">
+                      <div>
+                        <label className="text-xs font-bold text-green-200/80 mb-1 block uppercase tracking-wider">Método de Contacto</label>
+                        <input 
+                          type="text" 
+                          required
+                          value={contactMethod}
+                          onChange={(e) => setContactMethod(e.target.value)}
+                          className="w-full bg-black/50 border border-green-500/30 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-green-400 focus:ring-1 focus:ring-green-400 transition-all placeholder-green-900/50 font-medium" 
+                          placeholder="Ej. Binance, PayPal, WhatsApp, Discord"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-green-200/80 mb-1 block uppercase tracking-wider">Tus Datos</label>
+                        <input 
+                          type="text" 
+                          required
+                          value={contactDetails}
+                          onChange={(e) => setContactDetails(e.target.value)}
+                          className="w-full bg-black/50 border border-green-500/30 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-green-400 focus:ring-1 focus:ring-green-400 transition-all placeholder-green-900/50 font-medium" 
+                          placeholder="Ej. usuario@ejemplo.com o +12345678"
+                        />
+                      </div>
+                      <button type="submit" className="mt-2 w-full bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 text-white font-black py-3 rounded-xl transition-all shadow-[0_0_15px_rgba(34,197,94,0.3)] hover:shadow-[0_0_25px_rgba(34,197,94,0.5)] active:scale-95 uppercase tracking-wider">
+                        ENVIAR MIS DATOS
+                      </button>
+                    </form>
+                  )}
                 </motion.div>
-              </motion.div>
+              )}
 
               <motion.p
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ delay: 2.5 }}
-                className="text-yellow-500/70 uppercase tracking-widest text-xs font-bold text-center"
+                transition={{ delay: 2.0 }}
+                className="text-yellow-500/50 uppercase tracking-widest text-xs font-bold text-center relative z-10"
               >
                 El juego está en pausa.<br />
                 Preparando la nueva temporada...
@@ -1288,10 +1402,10 @@ export default function GamePage() {
                 {banReason || "Tu cuenta ha sido suspendida permanentemente por violar los términos del servicio o utilizar herramientas no autorizadas."}
               </p>
               
-              <div className="bg-red-900/50 rounded-xl p-4 mb-4 border border-red-500/30 w-full">
-                <span className="block text-red-400 text-sm font-bold uppercase tracking-widest mb-1">Tiempo Restante</span>
-                <span className="block text-white text-2xl font-black tracking-wider">
-                  {banExpiresAt ? (banTimeLeft || "Calculando...") : "INDEFINIDO"}
+              <div className="bg-red-900/50 p-4 rounded-xl border border-red-500/50 mb-6">
+                <span className="text-red-300 font-bold block mb-1">Tiempo Restante:</span>
+                <span className="text-2xl font-mono text-white">
+                  {banExpiresAt === 'permaban' ? 'INDEFINIDO' : banTimeLeft || 'Calculando...'}
                 </span>
               </div>
               
@@ -1432,6 +1546,86 @@ export default function GamePage() {
           <Link href="/about" className="hover:text-yellow-400 transition-colors">Reglas</Link>
         </div>
       </footer>
+
+      {/* MODAL DE NUEVA TEMPORADA */}
+      <AnimatePresence>
+        {showNewSeasonModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[999] flex items-center justify-center bg-black/95 p-4 backdrop-blur-md"
+          >
+            <motion.div
+              initial={{ scale: 0.8, y: 50 }}
+              animate={{ scale: 1, y: 0 }}
+              transition={{ type: "spring", damping: 20, stiffness: 100 }}
+              className="relative w-full max-w-xl bg-slate-950/90 border-2 border-yellow-500 rounded-3xl p-8 flex flex-col items-center shadow-[0_0_50px_rgba(234,179,8,0.2)] overflow-hidden"
+            >
+              {/* Resplandor de fondo interno */}
+              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-yellow-500/10 via-transparent to-transparent pointer-events-none" />
+
+              <button 
+                onClick={() => setShowNewSeasonModal(false)}
+                className="absolute top-4 right-4 text-slate-500 hover:text-white transition-colors z-10"
+              >
+                <X size={28} />
+              </button>
+              
+              <motion.div
+                initial={{ rotate: -10, scale: 0.8 }}
+                animate={{ rotate: [0, -10, 10, -10, 10, 0], scale: [1, 1.1, 1] }}
+                transition={{ duration: 1.5, ease: "easeInOut", times: [0, 0.2, 0.4, 0.6, 0.8, 1] }}
+              >
+                <Trophy className="w-20 h-20 text-yellow-500 mb-4 drop-shadow-[0_0_20px_rgba(234,179,8,0.6)]" />
+              </motion.div>
+
+              <h2 className="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-200 to-yellow-600 mb-2 uppercase tracking-widest text-center drop-shadow-sm">
+                ¡NUEVA TEMPORADA!
+              </h2>
+              <p className="text-yellow-200/80 text-lg mb-8 text-center font-medium">
+                Una nueva era ha comenzado. ¡Prepara tus dedos y compite!
+              </p>
+
+              <div className="w-full bg-slate-900/80 rounded-2xl p-6 border border-yellow-500/30 shadow-inner relative z-10">
+                <div className="flex flex-col items-center justify-center mb-6 pb-6 border-b border-yellow-500/20">
+                  <span className="text-slate-400 font-black uppercase tracking-widest text-sm mb-1">PREMIO BASE INICIAL</span>
+                  <span className="text-5xl font-black text-green-400 drop-shadow-[0_0_10px_rgba(74,222,128,0.4)]">
+                    {formatCurrency(baseUsdPrize, userCountry)}
+                  </span>
+                </div>
+
+                <div className="flex flex-col items-center text-center">
+                  <span className="inline-block px-4 py-1 rounded-full bg-yellow-500/20 border border-yellow-500/50 text-yellow-400 font-bold uppercase tracking-widest text-xs mb-4">
+                    MODO: {seasonMode.replace('_', ' ')}
+                  </span>
+                  
+                  <p className="text-base text-slate-300 leading-relaxed font-medium">
+                    {seasonMode === 'ganador_absoluto' && (
+                      <>El jugador que dé el <span className="text-yellow-400 font-bold">golpe de gracia definitivo</span> se llevará el <span className="text-green-400 font-bold">100% del premio</span>.</>
+                    )}
+                    {seasonMode === 'carrera_clicks' && (
+                      <>El premio se dividirá entre los 3 jugadores que den <span className="text-yellow-400 font-bold">más clics durante toda la temporada</span>: <br/><br/>
+                      <span className="text-green-400 font-bold">50%</span> al 1er puesto, <span className="text-green-400 font-bold">30%</span> al 2do y <span className="text-green-400 font-bold">20%</span> al 3ro.</>
+                    )}
+                    {seasonMode === 'el_golpe' && (
+                      <>El que dé el <span className="text-yellow-400 font-bold">golpe de gracia</span> se lleva el <span className="text-green-400 font-bold">50% del premio</span>. <br/><br/>
+                      El otro 50% se reparte entre los 2 que <span className="text-yellow-400 font-bold">más clics den</span> (<span className="text-green-400 font-bold">30%</span> al 1ro, <span className="text-green-400 font-bold">20%</span> al 2do).</>
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              <button 
+                onClick={() => setShowNewSeasonModal(false)}
+                className="mt-8 w-full py-4 bg-gradient-to-r from-yellow-600 to-yellow-500 hover:from-yellow-500 hover:to-yellow-400 text-slate-950 font-black text-xl rounded-2xl transition-all shadow-[0_0_20px_rgba(234,179,8,0.4)] hover:shadow-[0_0_30px_rgba(234,179,8,0.6)] active:scale-95 uppercase tracking-wider"
+              >
+                ¡A Romper el Huevo!
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </main>
   );
 }
