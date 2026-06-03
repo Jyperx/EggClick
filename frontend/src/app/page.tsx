@@ -610,10 +610,10 @@ export default function GamePage() {
           <div className="flex flex-col md:flex-row items-center gap-2 md:gap-4 bg-slate-900/60 backdrop-blur-xl border border-white/10 p-2 sm:p-3 md:p-6 rounded-[2rem] shadow-[0_0_40px_rgba(0,0,0,0.5)] ring-1 ring-black/50 scale-[0.85] sm:scale-95 md:scale-100 origin-top w-[110%] sm:w-[100%] md:w-auto mx-auto shrink-0">
 
             {/* Controles de la Izquierda (Billeteras y Botones) */}
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3 w-full md:w-auto">
 
-              {/* Fila Superior: Tu Billetera + Botones */}
-              <div className="flex items-end gap-4 justify-center md:justify-start">
+              {/* Fila Superior: Tu Billetera + Botones (Oculto en móvil si no hay sesión) */}
+              <div className={`items-end gap-4 justify-center md:justify-start ${status === 'authenticated' ? 'flex' : 'hidden md:flex'}`}>
 
                 {/* Tu Billetera */}
                 <div className="flex flex-col items-center">
@@ -674,6 +674,22 @@ export default function GamePage() {
                   </MouseTooltip>
                 </div>
               </div>
+
+              {/* Botón de Iniciar Sesión Prominente (Solo Móvil, reemplaza billetera) */}
+              {status !== 'authenticated' && (
+                <div className="flex md:hidden items-center justify-center w-full px-2">
+                  <button
+                    onClick={() => {
+                      setIsLoggingIn(true);
+                      signIn('google');
+                    }}
+                    disabled={isLoggingIn}
+                    className="w-full px-6 py-4 bg-gradient-to-br from-blue-600 to-indigo-700 hover:from-blue-500 hover:to-indigo-600 rounded-2xl text-sm font-black tracking-widest uppercase text-white shadow-[0_0_30px_rgba(79,70,229,0.5)] transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-wait border border-blue-400/30"
+                  >
+                    {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin" /> : <><User className="w-5 h-5" /> Iniciar Sesión para Jugar</>}
+                  </button>
+                </div>
+              )}
 
               {/* Fila Inferior: Tesoro Clan (Oculto en móvil) */}
               {userClanId && (
@@ -1219,7 +1235,7 @@ export default function GamePage() {
 
         <div className="w-6 h-px bg-slate-800"></div>
 
-        {status === 'authenticated' ? (
+        {status === 'authenticated' && (
           <>
             {/* Perfil */}
             <button onClick={() => { setEditUsername(username); setNameSuggestions([]); setShowProfileModal(true); }} className="flex flex-col items-center gap-1 active:scale-95 transition-transform p-1">
@@ -1233,22 +1249,6 @@ export default function GamePage() {
               <LogOut className="w-6 h-6 drop-shadow-md" />
             </button>
           </>
-        ) : (
-          /* Iniciar Sesión */
-          <button
-            onClick={() => {
-              setIsLoggingIn(true);
-              signIn('google');
-            }}
-            disabled={isLoggingIn}
-            className="flex flex-col items-center gap-1 active:scale-95 transition-transform p-1 disabled:opacity-70 disabled:cursor-wait"
-          >
-            {isLoggingIn ? (
-              <Loader2 className="w-6 h-6 text-blue-400 animate-spin" />
-            ) : (
-              <User className="w-6 h-6 text-blue-400 drop-shadow-[0_0_8px_rgba(96,165,250,0.8)]" />
-            )}
-          </button>
         )}
       </div>
 

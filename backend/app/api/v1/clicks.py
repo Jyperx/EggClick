@@ -254,13 +254,14 @@ async def process_click_batch(batch: ClickBatch, user_id: str, db: AsyncSession)
             
     used_ice_hands = getattr(batch, 'used_ice_hands', 0)
     
+    actual_ice_used = 0
     valid_frozen_clicks = 0
     if used_ice_hands > 0:
         current_ice = inventory.get("ice_hand_uses", 0)
         actual_ice = min(used_ice_hands, current_ice)
         if actual_ice > 0:
             inventory["ice_hand_uses"] -= actual_ice
-            session_clicks = 0
+            actual_ice_used = actual_ice
             valid_frozen_clicks = batch.frozen_clicks
             
     if valid_frozen_clicks == 0 and batch.frozen_clicks > 0:
@@ -324,15 +325,17 @@ async def process_click_batch(batch: ClickBatch, user_id: str, db: AsyncSession)
     session_clicks += batch.clicks + auto_clicks_pool
     
     cooldown_time = 0
-    old_thresh = get_highest_threshold(old_session)
-    new_thresh = get_highest_threshold(session_clicks)
     
-    if new_thresh > old_thresh:
-        penalty = get_cooldown_penalty(session_clicks)
-        if penalty > 0:
-            cooldown_end_calc = now + datetime.timedelta(seconds=penalty)
-            cooldown_until = cooldown_end_calc.isoformat()
-            cooldown_time = penalty
+    if actual_ice_used == 0:
+        old_thresh = get_highest_threshold(old_session)
+        new_thresh = get_highest_threshold(session_clicks)
+        
+        if new_thresh > old_thresh:
+            penalty = get_cooldown_penalty(session_clicks)
+            if penalty > 0:
+                cooldown_end_calc = now + datetime.timedelta(seconds=penalty)
+                cooldown_until = cooldown_end_calc.isoformat()
+                cooldown_time = penalty
             
     old_clicks = total_clicks
     new_coins_earned = ((old_clicks + total_added) // 10) - (old_clicks // 10)
