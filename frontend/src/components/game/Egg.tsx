@@ -69,7 +69,7 @@ export default function Egg({ onEggClick, sessionClicks = 0, cooldownTime = 0, i
   }, [autoClickTrigger, isOverheated, martilloUses, hamassUses]);
 
   useEffect(() => {
-    if (isHoldingLocal && touchMeSecs > 0 && !isOverheated) {
+    if (isHoldingLocal && touchMeSecs > 0 && !isOverheated && !isEggBroken) {
       let counter = 0;
       const timer = setInterval(() => {
         onEggClick(true);
@@ -87,7 +87,7 @@ export default function Egg({ onEggClick, sessionClicks = 0, cooldownTime = 0, i
       }, 50); // 20 clics por segundo
       return () => clearInterval(timer);
     }
-  }, [isHoldingLocal, touchMeSecs, isOverheated]);
+  }, [isHoldingLocal, touchMeSecs, isOverheated, isEggBroken]);
 
   const handlePointerDown = () => {
     setIsHoldingLocal(true);

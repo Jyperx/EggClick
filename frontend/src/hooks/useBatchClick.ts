@@ -10,6 +10,7 @@ export function useBatchClick(
   inventory?: Record<string, any>,
   reloadUser?: () => void,
   userWsRef?: React.MutableRefObject<WebSocket | null>,
+  isEggBroken?: boolean,
 ) {
   const clicksToFlush = useRef(0);
   const frozenClicksToFlush = useRef(0);
@@ -125,7 +126,7 @@ export function useBatchClick(
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
-    if (isHolding && localTouchMe > 0) {
+    if (isHolding && localTouchMe > 0 && !isEggBroken) {
       const lastTouchTick = Date.now();
       let prevTick = lastTouchTick;
 
@@ -181,7 +182,7 @@ export function useBatchClick(
       }, 250);
     }
     return () => clearInterval(timer);
-  }, [isHolding]);
+  }, [isHolding, isEggBroken]);
 
   const registerClick = (isAuto: boolean = false) => {
     if (status === "unauthenticated") {
@@ -313,7 +314,7 @@ export function useBatchClick(
   const lastAutoclickerTick = useRef(Date.now());
 
   useEffect(() => {
-    if (localAutoclicker > 0 && cooldownTime <= 0) {
+    if (localAutoclicker > 0 && cooldownTime <= 0 && !isEggBroken) {
       setIsAutoclicking(true);
       lastAutoclickerTick.current = Date.now();
 
@@ -375,7 +376,7 @@ export function useBatchClick(
     } else {
       setIsAutoclicking(false);
     }
-  }, [localAutoclicker, cooldownTime, freezeTimeLeft, session?.user?.email]);
+  }, [localAutoclicker, cooldownTime, freezeTimeLeft, session?.user?.email, isEggBroken]);
 
   const latestFetchId = useRef(0);
 

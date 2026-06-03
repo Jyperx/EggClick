@@ -214,7 +214,7 @@ export default function GamePage() {
   } = useBatchClick(500, (newEggCoins, newInventory) => {
     setEggCoins(newEggCoins);
     if (newInventory) setInventory(newInventory);
-  }, inventory, undefined, userWsRef);
+  }, inventory, undefined, userWsRef, isEggBroken);
 
   const currentUTCDateString = new Date().toISOString().split('T')[0];
 
