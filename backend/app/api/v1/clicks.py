@@ -95,13 +95,26 @@ async def beacon_clicks(request: Request, db: AsyncSession = Depends(get_db)):
     return await process_click_batch(batch, user_id, db)
 
 async def process_click_batch(batch: ClickBatch, user_id: str, db: AsyncSession):
-    # --- LIMITADOR DE FRECUENCIA DE API (Spam Bypass) ---
-    # Permite máximo 1 petición cada 400ms (el frontend envía cada 500ms)
-    rate_limit_key = f"rate_limit:{user_id}"
-    allowed = await redis_client.set(rate_limit_key, "1", px=400, nx=True)
-    if not allowed:
-        return {"status": "success", "message": "rate_limited"}
+    import asyncio
+    lock_key = f"lock:click_batch:{user_id}"
+    acquired = False
+    
+    # Esperar hasta 4 segundos por el lock
+    for _ in range(40):
+        acquired = await redis_client.set(lock_key, "1", ex=5, nx=True)
+        if acquired:
+            break
+        await asyncio.sleep(0.1)
+        
+    if not acquired:
+        return {"status": "success", "message": "rate_limited_or_busy"}
+        
+    try:
+        return await _process_click_batch_core(batch, user_id, db)
+    finally:
+        await redis_client.delete(lock_key)
 
+async def _process_click_batch_core(batch: ClickBatch, user_id: str, db: AsyncSession):
     # 1. Validar Anti-Bot
     is_valid = await validate_clicks(user_id, batch.clicks)
     if not is_valid:
