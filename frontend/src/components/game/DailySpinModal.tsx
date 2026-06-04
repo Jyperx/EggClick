@@ -79,10 +79,15 @@ export const DailySpinModal: React.FC<DailySpinModalProps> = ({
   const [buyQty, setBuyQty] = useState(1);
   const [timeLeft, setTimeLeft] = useState<string>('');
   const coinSoundRef = useRef<HTMLAudioElement | null>(null);
+  const giroSoundRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     coinSoundRef.current = new Audio('/sounds/monedas.mp3');
     coinSoundRef.current.volume = 0.7;
+    
+    giroSoundRef.current = new Audio('/sounds/giro.mp3');
+    giroSoundRef.current.loop = true;
+    giroSoundRef.current.volume = 0.5;
   }, []);
 
   const currentUTCDateString = new Date().toISOString().split('T')[0];
@@ -153,6 +158,11 @@ export const DailySpinModal: React.FC<DailySpinModalProps> = ({
     setDisplayAvailableSpins((prev: number) => Math.max(0, prev - 1));
     setDisplaySuperSpinUsed(true);
 
+    if (giroSoundRef.current) {
+      giroSoundRef.current.currentTime = 0;
+      giroSoundRef.current.play().catch(() => {});
+    }
+
     try {
       const res = await fetch(`${API_URL}/api/v1/game/user/${userId}/daily-spin`, {
         method: 'POST',
@@ -172,6 +182,10 @@ export const DailySpinModal: React.FC<DailySpinModalProps> = ({
       setTimeout(() => {
         setIsSpinning(false);
         setPrizeWon(data.prize);
+        
+        if (giroSoundRef.current) {
+          giroSoundRef.current.pause();
+        }
 
         // Reproducir sonido de monedas al revelar el premio
         if (coinSoundRef.current) {
@@ -188,6 +202,9 @@ export const DailySpinModal: React.FC<DailySpinModalProps> = ({
 
     } catch (err: any) {
       setIsSpinning(false);
+      if (giroSoundRef.current) {
+        giroSoundRef.current.pause();
+      }
       setError(err.message);
       // Rollback optimistic state
       setDisplayAvailableSpins(inventory?.available_spins || 0);
