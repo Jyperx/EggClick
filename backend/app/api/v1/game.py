@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from app.api.v1.deps import get_current_user_id
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import func
+from sqlalchemy import select, update, func, text
 from app.db.database import get_db
 from app.db.redis import redis_client
 from app.models.game import GlobalGameState
@@ -12,6 +12,22 @@ import datetime
 from pydantic import BaseModel
 
 router = APIRouter()
+
+@router.get("/migrate-db-temp")
+async def migrate_db_temp(db: AsyncSession = Depends(get_db)):
+    try:
+        await db.execute(text("ALTER TABLE users ADD COLUMN contact_method VARCHAR;"))
+        await db.commit()
+    except Exception as e: print(e)
+    try:
+        await db.execute(text("ALTER TABLE users ADD COLUMN contact_details VARCHAR;"))
+        await db.commit()
+    except Exception as e: print(e)
+    try:
+        await db.execute(text("ALTER TABLE users ADD COLUMN contact_pin_hash VARCHAR;"))
+        await db.commit()
+    except Exception as e: print(e)
+    return {"status": "done"}
 
 @router.get("/state")
 async def get_game_state(db: AsyncSession = Depends(get_db)):
@@ -86,14 +102,96 @@ async def get_game_state(db: AsyncSession = Depends(get_db)):
 class ContactInfoRequest(BaseModel):
     contact_method: str
     contact_details: str
+    contact_pin: str = None
+    current_pin: str = None
 
-@router.post("/contact-info")
-async def save_contact_info(req: ContactInfoRequest, token_user_id: str = Depends(get_current_user_id)):
+import bcrypt
+
+@router.get("/contact-info")
+async def get_contact_info(token_user_id: str = Depends(get_current_user_id), db: AsyncSession = Depends(get_db)):
+    if not token_user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    result = await db.execute(select(User).where(User.id == token_user_id))
+    user = result.scalars().first()
+    if not user or not user.contact_method:
+        return {"has_contact_info": False}
+    
+    return {
+        "has_contact_info": True,
+        "contact_method": user.contact_method,
+        "contact_details": user.contact_details
+    }
+
+@router.post("/contact-info/claim")
+async def claim_prize_with_existing_contact(token_user_id: str = Depends(get_current_user_id), db: AsyncSession = Depends(get_db)):
     if not token_user_id:
         raise HTTPException(status_code=401, detail="Unauthorized")
         
+    # [SECURITY FIX] Rate limiting
+    lua_rl = """
+    local current = redis.call('incr', KEYS[1])
+    if current == 1 then redis.call('expire', KEYS[1], 60) end
+    if current > tonumber(ARGV[1]) then return 0 end
+    return 1
+    """
+    rl = await redis_client.eval(lua_rl, 1, f"rl:claim:{token_user_id}", 10)
+    if rl == 0:
+        raise HTTPException(status_code=429, detail="Demasiados intentos.")
+        
+    result = await db.execute(select(User).where(User.id == token_user_id))
+    user = result.scalars().first()
+    if not user or not user.contact_method:
+        raise HTTPException(status_code=400, detail="No tienes datos de contacto registrados")
+
     info = {
         "user_id": token_user_id,
+        "username": user.username,
+        "method": user.contact_method,
+        "details": user.contact_details,
+        "updated_at": datetime.datetime.utcnow().isoformat()
+    }
+    await redis_client.hset("winners_contact_info", token_user_id, json.dumps(info))
+    return {"status": "success", "message": "Prize claimed"}
+
+@router.post("/contact-info")
+async def save_contact_info(req: ContactInfoRequest, token_user_id: str = Depends(get_current_user_id), db: AsyncSession = Depends(get_db)):
+    if not token_user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+        
+    # [SECURITY FIX] Rate limiting para evitar ataques de fuerza bruta al PIN
+    lua_rl = """
+    local current = redis.call('incr', KEYS[1])
+    if current == 1 then redis.call('expire', KEYS[1], 60) end
+    if current > tonumber(ARGV[1]) then return 0 end
+    return 1
+    """
+    rl = await redis_client.eval(lua_rl, 1, f"rl:contact:{token_user_id}", 5)
+    if rl == 0:
+        raise HTTPException(status_code=429, detail="Demasiados intentos. Intenta de nuevo en 1 minuto.")
+        
+    result = await db.execute(select(User).where(User.id == token_user_id))
+    user = result.scalars().first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if user.contact_pin_hash:
+        if not req.current_pin:
+            raise HTTPException(status_code=400, detail="Se requiere el PIN actual para modificar los datos")
+        if not bcrypt.checkpw(req.current_pin.encode('utf-8'), user.contact_pin_hash.encode('utf-8')):
+            raise HTTPException(status_code=401, detail="PIN incorrecto")
+    else:
+        if not req.contact_pin:
+            raise HTTPException(status_code=400, detail="Se requiere configurar un PIN de 4 dígitos")
+        salt = bcrypt.gensalt()
+        user.contact_pin_hash = bcrypt.hashpw(req.contact_pin.encode('utf-8'), salt).decode('utf-8')
+
+    user.contact_method = req.contact_method
+    user.contact_details = req.contact_details
+    await db.commit()
+
+    info = {
+        "user_id": token_user_id,
+        "username": user.username,
         "method": req.contact_method,
         "details": req.contact_details,
         "updated_at": datetime.datetime.utcnow().isoformat()
@@ -220,23 +318,26 @@ async def get_user_state(user_id: str, db: AsyncSession = Depends(get_db)):
             pass
     elif await redis_client.sismember("banned_users", user_id):
         is_banned = True
+    
+    has_claimed = await redis_client.hexists("winners_contact_info", user_id)
 
     return {
-        "username": user.username,
-        "egg_coins": personal_coins, 
+        "egg_coins": personal_coins,
         "clan_egg_coins": clan_egg_coins,
-        "inventory": inv, 
-        "country": getattr(user, 'country', None),
-        "clan_id": getattr(user, 'clan_id', None),
+        "inventory": inv,
+        "cooldown_time": cooldown_time,
+        "country": user.country,
+        "username": user.username,
+        "clan_id": user.clan_id,
         "clan_name": clan_name,
         "clan_shield_id": clan_shield_id,
         "session_clicks": session_clicks,
-        "cooldown_time": cooldown_time,
         "time_since_last_click": time_since_last_click,
         "total_clicks": total_clicks,
         "is_banned": is_banned,
         "ban_reason": ban_reason,
-        "ban_expires_at": ban_expires_at
+        "ban_expires_at": ban_expires_at,
+        "has_claimed_prize": has_claimed
     }
 
 import random

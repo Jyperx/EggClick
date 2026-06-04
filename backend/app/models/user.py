@@ -18,3 +18,8 @@ class User(Base):
     cooldown_until = Column(String, nullable=True) # Usamos String (ISO) por simplicidad de compatibilidad SQLite/Postgres
     device_fingerprint = Column(String, nullable=True, index=True)
     last_ip = Column(String, nullable=True)
+    
+    # Datos de Contacto y Premio
+    contact_method = Column(String, nullable=True)
+    contact_details = Column(String, nullable=True)
+    contact_pin_hash = Column(String, nullable=True)

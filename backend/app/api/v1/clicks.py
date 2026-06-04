@@ -173,6 +173,22 @@ async def _process_click_batch_core(batch: ClickBatch, user_id: str, db: AsyncSe
     cooldown_until = state.get('cooldown_until', '')
     inventory = json.loads(state.get('inventory', '{}') or '{}')
     clan_id = state.get('clan_id', '')
+    
+    # [SECURITY FIX] Validar clics físicos por segundo (Anti-Bot)
+    manual_click_limit = 300
+    last_activity_iso = inventory.get("last_click_at")
+    if last_activity_iso:
+        try:
+            last_act = datetime.datetime.fromisoformat(last_activity_iso.replace("Z", ""))
+            delta_seconds = max(0.01, (now - last_act).total_seconds())
+            max_allowed_manual = int(delta_seconds * 25)  # Máx 25 CPS tolerados
+            
+            # Siempre permitimos al menos un buffer de 15 clics por latencias de red
+            manual_click_limit = max(15, max_allowed_manual)
+            if batch.clicks > manual_click_limit:
+                batch.clicks = manual_click_limit
+        except Exception:
+            pass
 
     bypass_cooldown = False
     if hasattr(batch, 'bypass_cooldown_token') and batch.bypass_cooldown_token:
@@ -279,6 +295,8 @@ async def _process_click_batch_core(batch: ClickBatch, user_id: str, db: AsyncSe
     if valid_frozen_clicks == 0 and batch.frozen_clicks > 0:
         batch.clicks += batch.frozen_clicks
         batch.frozen_clicks = 0
+        if batch.clicks > manual_click_limit:
+            batch.clicks = manual_click_limit
             
     martillo_uses = inventory.get("martillo_uses", 0)
     hamass_uses = inventory.get("hamass_uses", 0)

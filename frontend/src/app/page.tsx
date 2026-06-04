@@ -11,7 +11,7 @@ import EggTemperaturePanel from '@/components/game/EggTemperaturePanel';
 import FloatingNotifications, { NotificationItem } from '@/components/game/FloatingNotifications';
 import { useBatchClick } from '@/hooks/useBatchClick';
 import { CountryCode, formatCurrency } from '@/lib/currency';
-import { ShoppingBag, Trophy, Loader2, WifiOff, Gift, X, Shield, Gamepad2, Settings, LogOut, User, ShieldAlert, ShieldCheck, ChevronRight, ChevronLeft } from 'lucide-react';
+import { ShoppingBag, Trophy, Loader2, WifiOff, Gift, X, Shield, Gamepad2, Settings, LogOut, User, ShieldAlert, ShieldCheck, ChevronRight, ChevronLeft, Check } from 'lucide-react';
 import { DailySpinModal } from '@/components/game/DailySpinModal';
 
 import { getRankInfo } from '@/lib/ranking';
@@ -66,7 +66,17 @@ export default function GamePage() {
   const [showContactForm, setShowContactForm] = useState(false);
   const [contactMethod, setContactMethod] = useState('');
   const [contactDetails, setContactDetails] = useState('');
+  const [contactPin, setContactPin] = useState('');
+  const [currentPin, setCurrentPin] = useState('');
+  const [hasContactInfo, setHasContactInfo] = useState(false);
+  const [isChangingContact, setIsChangingContact] = useState(false);
+  const [isChangingProfileContact, setIsChangingProfileContact] = useState(false);
+  const [contactError, setContactError] = useState('');
   const [contactSubmitted, setContactSubmitted] = useState(false);
+  const [originalContactMethod, setOriginalContactMethod] = useState('');
+  const [originalContactDetails, setOriginalContactDetails] = useState('');
+  const [isSubmittingContact, setIsSubmittingContact] = useState(false);
+  const [contactSuccessMsg, setContactSuccessMsg] = useState('');
   
   const [userCountry, setUserCountry] = useState<CountryCode>('CO');
   const [showCountryModal, setShowCountryModal] = useState(false);
@@ -75,6 +85,14 @@ export default function GamePage() {
   // Inventario
   const [inventory, setInventory] = useState<Record<string, any>>({});
   const [isUserLoaded, setIsUserLoaded] = useState(false);
+  const [minLoadingTimePassed, setMinLoadingTimePassed] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setMinLoadingTimePassed(true);
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, []);
   const [isMultiTabBlocked, setIsMultiTabBlocked] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
 
@@ -134,7 +152,31 @@ export default function GamePage() {
 
   const submitContactInfo = async (e: React.FormEvent) => {
     e.preventDefault();
+    setContactError('');
+    setContactSuccessMsg('');
     if (!contactMethod || !contactDetails) return;
+    
+    if (hasContactInfo && contactMethod === originalContactMethod && contactDetails === originalContactDetails) {
+      setContactError('No has realizado ningún cambio.');
+      return;
+    }
+    
+    const body: any = { contact_method: contactMethod, contact_details: contactDetails };
+    if (hasContactInfo) {
+      if (!currentPin) {
+        setContactError('Ingresa tu PIN actual de 4 dígitos');
+        return;
+      }
+      body.current_pin = currentPin;
+    } else {
+      if (!contactPin || contactPin.length !== 4) {
+        setContactError('Debes crear un PIN de 4 dígitos');
+        return;
+      }
+      body.contact_pin = contactPin;
+    }
+
+    setIsSubmittingContact(true);
     try {
       const res = await fetch(`${API_URL}/api/v1/game/contact-info`, {
         method: 'POST',
@@ -142,13 +184,57 @@ export default function GamePage() {
           'Authorization': `Bearer ${cachedToken.current}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ contact_method: contactMethod, contact_details: contactDetails })
+        body: JSON.stringify(body)
       });
       if (res.ok) {
-        setContactSubmitted(true);
+        setContactSuccessMsg('¡Guardado exitosamente!');
+        setOriginalContactMethod(contactMethod);
+        setOriginalContactDetails(contactDetails);
+        setTimeout(() => {
+          setContactSubmitted(true);
+          if (session?.user?.email) localStorage.setItem(`prize_claimed_${session.user.email}`, 'true');
+          setHasContactInfo(true);
+          setIsChangingContact(false);
+          setIsChangingProfileContact(false);
+          setCurrentPin('');
+          setContactSuccessMsg('');
+          setBrokenEggTab('info');
+        }, 1500);
+      } else {
+        const errorData = await res.json();
+        setContactError(errorData.detail || 'Error al guardar los datos');
       }
     } catch (e) {
       console.error(e);
+      setContactError('Error de red al guardar los datos');
+    } finally {
+      setIsSubmittingContact(false);
+    }
+  };
+
+  const claimExistingContact = async () => {
+    setIsSubmittingContact(true);
+    setContactSuccessMsg('');
+    try {
+      const res = await fetch(`${API_URL}/api/v1/game/contact-info/claim`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${cachedToken.current}`
+        }
+      });
+      if (res.ok) {
+        setContactSuccessMsg('¡Datos verificados exitosamente!');
+        setTimeout(() => {
+          setContactSubmitted(true);
+          if (session?.user?.email) localStorage.setItem(`prize_claimed_${session.user.email}`, 'true');
+          setBrokenEggTab('info');
+          setContactSuccessMsg('');
+        }, 1500);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsSubmittingContact(false);
     }
   };
 
@@ -290,6 +376,26 @@ export default function GamePage() {
         .then(res => res.json())
         .then(data => {
           if (data) {
+            if (data.has_claimed_prize) {
+              setContactSubmitted(true);
+              if (session?.user?.email) localStorage.setItem(`prize_claimed_${session.user.email}`, 'true');
+            }
+            
+            if (cachedToken.current) {
+              fetch(`${API_URL}/api/v1/game/contact-info`, {
+                headers: { 'Authorization': `Bearer ${cachedToken.current}` }
+              })
+                .then(r => r.json())
+                .then(cData => {
+                  if (cData.has_contact_info) {
+                    setHasContactInfo(true);
+                    setContactMethod(cData.contact_method);
+                    setOriginalContactMethod(cData.contact_method);
+                    setContactDetails(cData.contact_details);
+                    setOriginalContactDetails(cData.contact_details);
+                  }
+                }).catch(() => {});
+            }
             setEggCoins(data.egg_coins || 0);
             if (data.clan_id) {
               setClanEggCoins(data.clan_egg_coins || 0);
@@ -534,6 +640,12 @@ export default function GamePage() {
 
   // Cargar estado inicial del usuario si hay sesión
   useEffect(() => {
+    if (session?.user?.email) {
+      const claimed = localStorage.getItem(`prize_claimed_${session.user.email}`);
+      if (claimed === 'true') {
+        setContactSubmitted(true);
+      }
+    }
     reloadUser();
 
     // Escuchar compras en la tienda
@@ -659,7 +771,7 @@ export default function GamePage() {
     />
   ) : null, [session, isDailySpinOpen, inventory]);
 
-  if (status === 'authenticated' && !isUserLoaded) {
+  if (status === 'authenticated' && (!isUserLoaded || !minLoadingTimePassed)) {
     return (
       <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center relative overflow-hidden px-4">
         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:40px_40px] pointer-events-none" />
@@ -669,13 +781,14 @@ export default function GamePage() {
           <motion.div
             animate={{ y: [0, -20, 0] }}
             transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-            className="relative w-64 h-64 md:w-96 md:h-96 drop-shadow-[0_0_40px_rgba(236,72,153,0.4)]"
+            className="w-[80vw] max-w-sm drop-shadow-[0_0_40px_rgba(236,72,153,0.4)]"
           >
             <Image
               src="/splash.webp"
               alt="EggClick Logo"
-              fill
-              className="object-contain"
+              width={800}
+              height={800}
+              className="w-full h-auto object-contain"
               priority
             />
           </motion.div>
@@ -1241,6 +1354,93 @@ export default function GamePage() {
                   )}
                 </div>
 
+                {/* Contact Data Section */}
+                <div className="mb-6 text-left p-4 bg-black/40 border border-white/10 rounded-xl relative max-h-[400px] overflow-y-auto custom-scrollbar">
+                  <h3 className="text-white font-black text-sm uppercase tracking-widest mb-3 flex items-center gap-2">
+                    <Trophy className="w-4 h-4 text-yellow-500" />
+                    Tus Datos de Premio
+                  </h3>
+                  
+                  {!isChangingProfileContact ? (
+                    <div>
+                      {hasContactInfo ? (
+                        <>
+                          <p className="text-white/60 text-[10px] font-bold uppercase mb-1">Método de Contacto</p>
+                          <p className="text-white font-medium mb-2 text-sm">{contactMethod}</p>
+                          <p className="text-white/60 text-[10px] font-bold uppercase mb-1">Detalles de la cuenta</p>
+                          <p className="text-white font-medium text-sm">{contactDetails}</p>
+                        </>
+                      ) : (
+                        <p className="text-white/50 text-xs font-bold uppercase mb-3 text-center py-2">
+                          No tienes datos de contacto registrados.
+                        </p>
+                      )}
+                      <button 
+                        onClick={() => {
+                          setIsChangingProfileContact(true);
+                          setContactError('');
+                          setCurrentPin('');
+                          setContactPin('');
+                        }}
+                        className="w-full mt-3 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-white font-bold uppercase tracking-widest text-xs transition-colors"
+                      >
+                        {hasContactInfo ? 'Cambiar Datos' : 'Configurar Datos'}
+                      </button>
+                    </div>
+                  ) : (
+                    <form onSubmit={(e) => {
+                      submitContactInfo(e).then(() => {
+                        if (document.querySelector('form .text-red-400') === null) {
+                           // Se guardó exitosamente (si no hay error nuevo)
+                           // Nota: setIsChangingProfileContact(false) se llama en submitContactInfo, pero podemos forzar el chequeo.
+                        }
+                      });
+                    }} className="flex flex-col gap-3">
+                      {contactError && (
+                        <div className="text-red-400 bg-red-900/20 p-2 rounded text-center text-[10px] font-bold uppercase">
+                          {contactError}
+                        </div>
+                      )}
+                      {contactSuccessMsg && (
+                        <div className="text-green-400 bg-green-900/20 p-2 rounded text-center text-[10px] font-bold uppercase flex items-center justify-center gap-1">
+                          <Check className="w-4 h-4" /> {contactSuccessMsg}
+                        </div>
+                      )}
+                      <div>
+                        <label className="text-[10px] font-bold text-green-200/80 mb-1 block uppercase">Método</label>
+                        <input type="text" required value={contactMethod} onChange={e => setContactMethod(e.target.value)} className="w-full bg-black/50 border border-green-500/30 rounded-lg px-3 py-2 text-white focus:border-green-400 text-sm" placeholder="Ej. Binance" />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-green-200/80 mb-1 block uppercase">Detalles</label>
+                        <input type="text" required value={contactDetails} onChange={e => setContactDetails(e.target.value)} className="w-full bg-black/50 border border-green-500/30 rounded-lg px-3 py-2 text-white focus:border-green-400 text-sm" placeholder="ID, Correo..." />
+                      </div>
+                      
+                      {hasContactInfo ? (
+                        <div>
+                          <label className="text-[10px] font-bold text-yellow-200/80 mb-1 block uppercase">PIN Actual</label>
+                          <input type="password" maxLength={4} required value={currentPin} onChange={e => setCurrentPin(e.target.value.replace(/[^0-9]/g, ''))} className="w-full bg-black/50 border border-yellow-500/50 rounded-lg px-3 py-2 text-white focus:border-yellow-400 text-center tracking-[0.5em] text-sm" placeholder="••••" />
+                        </div>
+                      ) : (
+                        <div>
+                          <label className="text-[10px] font-bold text-blue-200/80 mb-1 block uppercase">Crear PIN (4 dígitos)</label>
+                          <input type="password" maxLength={4} required value={contactPin} onChange={e => setContactPin(e.target.value.replace(/[^0-9]/g, ''))} className="w-full bg-black/50 border border-blue-500/50 rounded-lg px-3 py-2 text-white focus:border-blue-400 text-center tracking-[0.5em] text-sm" placeholder="••••" />
+                        </div>
+                      )}
+                      
+                      <div className="flex gap-2 mt-2">
+                        <button type="button" onClick={() => setIsChangingProfileContact(false)} disabled={isSubmittingContact} className="w-1/3 py-2 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-lg uppercase text-[10px] disabled:opacity-50">Cancelar</button>
+                        <button 
+                          type="submit" 
+                          disabled={isSubmittingContact || (hasContactInfo && contactMethod === originalContactMethod && contactDetails === originalContactDetails)}
+                          className="flex-1 py-2 bg-green-600 hover:bg-green-500 text-white font-bold rounded-lg uppercase text-[10px] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                          {isSubmittingContact ? <span className="animate-spin h-4 w-4 border-2 border-white/30 border-t-white rounded-full"></span> : 'Guardar'}
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                </div>
+
                 <div className="flex gap-3">
                   <button
                     onClick={() => {
@@ -1403,7 +1603,7 @@ export default function GamePage() {
                               <tr key={idx} className="border-t border-slate-700/50 hover:bg-slate-700/30 transition-colors">
                                 <td className="px-3 md:px-4 py-3 md:py-4 font-bold text-white text-xs md:text-base">{w.username}</td>
                                 <td className="px-3 md:px-4 py-3 md:py-4 text-[10px] md:text-xs font-semibold text-yellow-500">{w.reason.toUpperCase()}</td>
-                                <td className="px-3 md:px-4 py-3 md:py-4 text-right font-black text-green-400 text-xs md:text-base">${w.prize_usd.toFixed(2)}</td>
+                                <td className="px-3 md:px-4 py-3 md:py-4 text-right font-black text-green-400 text-xs md:text-base">{formatCurrency(w.prize_usd, userCountry)}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -1419,14 +1619,21 @@ export default function GamePage() {
                   </div>
 
                   {seasonWinners.some(w => w.user_id === (session?.user?.email || 'anon_user') || w.username === username) && (
-                    <button 
-                      onClick={() => setBrokenEggTab('contact')}
-                      className="w-full mb-6 p-4 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 text-white font-black rounded-2xl relative z-10 shadow-[0_0_20px_rgba(34,197,94,0.3)] hover:shadow-[0_0_30px_rgba(34,197,94,0.5)] transition-all flex items-center justify-center gap-2 uppercase tracking-widest active:scale-95 text-sm md:text-base"
-                    >
-                      <Trophy className="w-5 h-5 text-yellow-300" />
-                      Reclamar Premio
-                      <ChevronRight className="w-5 h-5" />
-                    </button>
+                    contactSubmitted ? (
+                      <div className="w-full mb-6 p-4 bg-green-900/40 border border-green-500/50 rounded-2xl relative z-10 text-center shadow-[0_0_20px_rgba(34,197,94,0.2)] flex flex-col items-center gap-1">
+                        <span className="text-green-400 font-black uppercase tracking-widest text-sm md:text-base">¡Premio Reclamado!</span>
+                        <span className="text-green-300/80 text-[10px] md:text-xs font-bold uppercase">En breve nos contactaremos contigo</span>
+                      </div>
+                    ) : (
+                      <button 
+                        onClick={() => setBrokenEggTab('contact')}
+                        className="w-full mb-6 p-4 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 text-white font-black rounded-2xl relative z-10 shadow-[0_0_20px_rgba(34,197,94,0.3)] hover:shadow-[0_0_30px_rgba(34,197,94,0.5)] transition-all flex items-center justify-center gap-2 uppercase tracking-widest active:scale-95 text-sm md:text-base"
+                      >
+                        <Trophy className="w-5 h-5 text-yellow-300" />
+                        Reclamar Premio
+                        <ChevronRight className="w-5 h-5" />
+                      </button>
+                    )
                   )}
 
                   <motion.p
@@ -1458,8 +1665,45 @@ export default function GamePage() {
                       <div className="text-center font-bold text-green-300 bg-green-900/40 p-4 rounded-xl border border-green-500/30 text-sm md:text-base">
                         ¡Datos enviados! Nos pondremos en contacto contigo pronto.
                       </div>
+                    ) : hasContactInfo && !isChangingContact ? (
+                      <div className="flex flex-col gap-4">
+                        {contactSuccessMsg && (
+                          <div className="text-green-400 bg-green-900/20 border border-green-500/30 p-2 rounded text-center text-xs font-bold uppercase flex items-center justify-center gap-2 mb-2">
+                            <Check className="w-5 h-5" /> {contactSuccessMsg}
+                          </div>
+                        )}
+                        <div className="bg-black/50 border border-green-500/30 rounded-xl p-4 text-center">
+                          <p className="text-green-300 font-bold mb-1 uppercase tracking-widest text-xs">Datos Registrados:</p>
+                          <p className="text-white text-lg font-black">{contactMethod}</p>
+                          <p className="text-white/80 font-medium">{contactDetails}</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={claimExistingContact}
+                            disabled={isSubmittingContact}
+                            className="w-1/2 p-3 bg-green-600 hover:bg-green-500 rounded-xl font-black uppercase tracking-widest text-white shadow-[0_0_15px_rgba(34,197,94,0.3)] hover:scale-[1.02] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                          >
+                            {isSubmittingContact ? <span className="animate-spin h-5 w-5 border-4 border-white/30 border-t-white rounded-full"></span> : 'Correcto'}
+                          </button>
+                          <button
+                            onClick={() => setIsChangingContact(true)}
+                            disabled={isSubmittingContact}
+                            className="w-1/2 p-3 bg-slate-800 hover:bg-slate-700 rounded-xl font-black uppercase tracking-widest text-white border border-slate-600 hover:border-slate-400 transition-all disabled:opacity-50"
+                          >Cambiar</button>
+                        </div>
+                      </div>
                     ) : (
                       <form onSubmit={submitContactInfo} className="flex flex-col gap-4 md:gap-5">
+                        {contactError && (
+                          <div className="text-red-400 bg-red-900/20 border border-red-500/30 p-2 rounded text-center text-xs font-bold uppercase">
+                            {contactError}
+                          </div>
+                        )}
+                        {contactSuccessMsg && (
+                          <div className="text-green-400 bg-green-900/20 border border-green-500/30 p-2 rounded text-center text-xs font-bold uppercase flex items-center justify-center gap-2">
+                            <Check className="w-5 h-5" /> {contactSuccessMsg}
+                          </div>
+                        )}
                         <div>
                           <label className="text-[10px] md:text-xs font-bold text-green-200/80 mb-2 block uppercase tracking-wider">Método de Contacto</label>
                           <input 
@@ -1472,19 +1716,74 @@ export default function GamePage() {
                           />
                         </div>
                         <div>
-                          <label className="text-[10px] md:text-xs font-bold text-green-200/80 mb-2 block uppercase tracking-wider">Tus Datos</label>
+                          <label className="text-[10px] md:text-xs font-bold text-green-200/80 mb-2 block uppercase tracking-wider">Detalles de la cuenta</label>
                           <input 
                             type="text" 
                             required
                             value={contactDetails}
                             onChange={(e) => setContactDetails(e.target.value)}
                             className="w-full bg-black/50 border border-green-500/30 rounded-xl px-4 py-3 md:py-4 text-white focus:outline-none focus:border-green-400 focus:ring-1 focus:ring-green-400 transition-all placeholder-green-900/50 font-medium text-sm md:text-base" 
-                            placeholder="Ej. usuario@ejemplo.com"
+                            placeholder="Ej. ID, Correo, Número..."
                           />
                         </div>
-                        <button type="submit" className="mt-4 w-full bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 text-white font-black py-4 rounded-xl transition-all shadow-[0_0_15px_rgba(34,197,94,0.3)] hover:shadow-[0_0_25px_rgba(34,197,94,0.5)] active:scale-95 uppercase tracking-wider text-sm md:text-base">
-                          ENVIAR MIS DATOS
-                        </button>
+                        
+                        {hasContactInfo ? (
+                          <div>
+                            <label className="text-[10px] md:text-xs font-bold text-yellow-200/80 mb-2 block uppercase tracking-wider">PIN Actual de 4 Dígitos</label>
+                            <input 
+                              type="password"
+                              maxLength={4} 
+                              required
+                              value={currentPin}
+                              onChange={(e) => setCurrentPin(e.target.value.replace(/[^0-9]/g, ''))}
+                              className="w-full bg-black/50 border border-yellow-500/50 rounded-xl px-4 py-3 md:py-4 text-white focus:outline-none focus:border-yellow-400 focus:ring-1 focus:ring-yellow-400 transition-all font-black tracking-[1em] text-center text-lg" 
+                              placeholder="••••"
+                            />
+                            <p className="text-[10px] text-yellow-500/70 mt-2 text-center">Requerido para autorizar cambios</p>
+                          </div>
+                        ) : (
+                          <div>
+                            <label className="text-[10px] md:text-xs font-bold text-blue-200/80 mb-2 block uppercase tracking-wider">Crea un PIN de 4 Dígitos</label>
+                            <input 
+                              type="password"
+                              maxLength={4} 
+                              required
+                              value={contactPin}
+                              onChange={(e) => setContactPin(e.target.value.replace(/[^0-9]/g, ''))}
+                              className="w-full bg-black/50 border border-blue-500/50 rounded-xl px-4 py-3 md:py-4 text-white focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-all font-black tracking-[1em] text-center text-lg" 
+                              placeholder="••••"
+                            />
+                            <p className="text-[10px] text-blue-300/70 mt-2 text-center uppercase">Guarda este PIN para cambiar tus datos a futuro</p>
+                          </div>
+                        )}
+                        
+                        <div className="flex gap-2">
+                          {isChangingContact && (
+                            <button 
+                              type="button"
+                              onClick={() => {
+                                setIsChangingContact(false);
+                                setContactError('');
+                                setContactSuccessMsg('');
+                              }}
+                              disabled={isSubmittingContact}
+                              className="w-1/3 py-3 md:py-4 bg-slate-800 hover:bg-slate-700 text-white font-black rounded-xl transition-all uppercase tracking-widest text-xs md:text-sm disabled:opacity-50"
+                            >
+                              Cancelar
+                            </button>
+                          )}
+                          <button 
+                            type="submit"
+                            disabled={isSubmittingContact || (hasContactInfo && contactMethod === originalContactMethod && contactDetails === originalContactDetails)}
+                            className="flex-1 py-3 md:py-4 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 text-white font-black rounded-xl shadow-[0_0_15px_rgba(34,197,94,0.3)] hover:shadow-[0_0_25px_rgba(34,197,94,0.5)] transition-all uppercase tracking-widest text-sm md:text-base disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                          >
+                            {isSubmittingContact ? (
+                              <span className="animate-spin h-6 w-6 border-4 border-white/30 border-t-white rounded-full"></span>
+                            ) : (
+                              hasContactInfo ? 'Actualizar Datos' : 'Enviar Datos'
+                            )}
+                          </button>
+                        </div>
                       </form>
                     )}
                   </div>
@@ -1596,6 +1895,14 @@ export default function GamePage() {
       <CookieBanner />
       <TutorialModal />
 
+      {/* Mobile Nav Overlay */}
+      {isMobileNavOpen && (
+        <div 
+          className="md:hidden fixed inset-0 z-30 bg-transparent"
+          onClick={() => setIsMobileNavOpen(false)}
+        />
+      )}
+
       {/* Navigation Sidebar (Mobile) */}
       <div className={`md:hidden fixed left-0 top-1/2 -translate-y-1/2 z-40 transition-transform duration-300 flex flex-row-reverse items-center ${isMobileNavOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         
@@ -1611,7 +1918,7 @@ export default function GamePage() {
         {/* Contenido del menú */}
         <div className="flex flex-col items-center gap-3 bg-slate-900/90 backdrop-blur-xl border border-white/10 p-2 py-4 rounded-r-2xl shadow-[0_0_20px_rgba(0,0,0,0.5)] ml-0 w-16">
           {/* Clan */}
-        <button onClick={() => setIsClanOpen(true)} className="flex flex-col items-center gap-1 active:scale-95 transition-transform relative p-1">
+        <button onClick={() => { setIsClanOpen(true); setIsMobileNavOpen(false); }} className="flex flex-col items-center gap-1 active:scale-95 transition-transform relative p-1">
           <div className="relative">
             {userClanName ? (
               <Image src={`/sprites/clan/${userClanShieldId}.png`} alt="Clan" width={28} height={28} unoptimized className={getClanTheme(userClanShieldId).dropGlow} />
@@ -1624,14 +1931,14 @@ export default function GamePage() {
         <div className="w-6 h-px bg-slate-800"></div>
 
         {/* Botón Ranking (Móvil) */}
-        <button onClick={() => setIsLeaderboardOpen(true)} className="flex flex-col items-center gap-1 active:scale-95 transition-transform relative p-1">
+        <button onClick={() => { setIsLeaderboardOpen(true); setIsMobileNavOpen(false); }} className="flex flex-col items-center gap-1 active:scale-95 transition-transform relative p-1">
           <Trophy className="w-6 h-6 text-yellow-500 drop-shadow-md" />
         </button>
 
         <div className="w-6 h-px bg-slate-800"></div>
 
         {/* Casino */}
-        <button onClick={() => setIsDailySpinOpen(true)} className="flex flex-col items-center gap-1 active:scale-95 transition-transform relative p-1">
+        <button onClick={() => { setIsStoreOpen(true); setIsMobileNavOpen(false); }} className="flex flex-col items-center gap-1 active:scale-95 transition-transform relative p-1">
           <div className="relative">
             <Image src="/sprites/moneda.png" alt="Casino" width={28} height={28} unoptimized className="drop-shadow-[0_0_10px_rgba(250,204,21,0.8)]" />
             <div className="absolute inset-0 bg-yellow-400/30 rounded-full animate-ping opacity-50 blur-[2px]"></div>
