@@ -8,32 +8,29 @@ interface VideoAdModalProps {
 }
 
 export function VideoAdModal({ onAdComplete, onCancel }: VideoAdModalProps) {
+  const [hasStarted, setHasStarted] = useState(false);
   const [timeLeft, setTimeLeft] = useState(15); // Simulación de 15 segundos
   const [canClose, setCanClose] = useState(false);
   const [loading, setLoading] = useState(false);
   const { data: session } = useSession();
 
+  const startAd = () => {
+    setHasStarted(true);
+  };
+
   useEffect(() => {
-    if (timeLeft > 0) {
+    if (hasStarted && timeLeft > 0) {
       const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
       return () => clearTimeout(timer);
-    } else {
+    } else if (hasStarted && timeLeft <= 0) {
       setCanClose(true);
     }
-  }, [timeLeft]);
+  }, [hasStarted, timeLeft]);
 
   const handleFinish = async () => {
     if (!canClose) return;
     setLoading(true);
     try {
-      // Llamada al backend para saltar el cooldown
-      // Se asume que el token JWT está disponible o el session envía cookie
-      // Para NextAuth con FastAPI, solemos mandar el token en la cabecera
-      // Dependiendo de tu config, si usas cookies de NextAuth podrías no necesitar enviarlo manual.
-      // Aquí simulamos que se resetea por el servidor. En la realidad la función onAdComplete() 
-      // podría llamar al endpoint. Por limpieza lo dejamos delegar al padre si es necesario, 
-      // pero también podemos dispararlo directo si le pasamos el token:
-      
       onAdComplete(); // Avisar al componente padre que se vio el anuncio
     } catch (e) {
       console.error(e);
@@ -48,18 +45,29 @@ export function VideoAdModal({ onAdComplete, onCancel }: VideoAdModalProps) {
         
         {/* Simulación del "Video" */}
         <div className="w-full aspect-video bg-black flex items-center justify-center mb-6 rounded border border-gray-800">
-          <p className="text-gray-500 animate-pulse flex flex-col items-center">
-            <span className="text-3xl mb-2">📺</span>
-            [Anuncio Simulado de AdSense/Monetag]
-          </p>
+          {!hasStarted ? (
+            <button
+              onClick={startAd}
+              className="bg-pink-600 hover:bg-pink-500 text-white font-black py-4 px-8 rounded-xl shadow-[0_0_20px_rgba(219,39,119,0.5)] transition-all active:scale-95"
+            >
+              ▶ VER ANUNCIO
+            </button>
+          ) : (
+            <p className="text-pink-500 animate-pulse flex flex-col items-center">
+              <span className="text-3xl mb-2">📺</span>
+              Reproduciendo anuncio...
+            </p>
+          )}
         </div>
 
         <h3 className="text-xl font-bold text-white mb-2">
-          {canClose ? "¡Recompensa Lista!" : "Enfriando el huevo..."}
+          {!hasStarted ? "Requiere ver un anuncio" : canClose ? "¡Recompensa Lista!" : "Enfriando el huevo..."}
         </h3>
         
         <p className="text-gray-400 mb-6">
-          {canClose 
+          {!hasStarted 
+            ? "Haz clic en reproducir para ver un anuncio y enfriar el huevo al instante."
+            : canClose 
             ? "Gracias por ver el anuncio. Tu huevo se ha enfriado por completo." 
             : `El anuncio terminará en ${timeLeft} segundos.`}
         </p>
@@ -75,9 +83,10 @@ export function VideoAdModal({ onAdComplete, onCancel }: VideoAdModalProps) {
         ) : (
           <button
             onClick={onCancel}
-            className="w-full bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold py-3 px-4 rounded-lg transition-colors"
+            disabled={hasStarted}
+            className={`w-full font-bold py-3 px-4 rounded-lg transition-colors ${hasStarted ? 'bg-gray-800 text-gray-600 cursor-not-allowed' : 'bg-gray-800 hover:bg-gray-700 text-gray-300'}`}
           >
-            Cancelar (No enfriar)
+            {hasStarted ? "Por favor espera..." : "Cancelar (No enfriar)"}
           </button>
         )}
       </div>

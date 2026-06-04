@@ -41,6 +41,9 @@ export default function RootLayout({
       lang="es"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        <script src="https://quge5.com/88/tag.min.js" data-zone="246067" async data-cfasync="false"></script>
+      </head>
       <body className="min-h-full flex flex-col">
         <Providers>
           {children}

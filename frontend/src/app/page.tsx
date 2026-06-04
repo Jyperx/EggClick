@@ -25,6 +25,7 @@ import MouseTooltip from '@/components/ui/MouseTooltip';
 import { CookieBanner } from '@/components/ui/CookieBanner';
 import { TutorialModal } from '@/components/ui/TutorialModal';
 import { VideoAdModal } from '@/components/ads/VideoAdModal';
+import { useAdblockDetector } from '@/hooks/useAdblockDetector';
 import Link from 'next/link';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const WS_URL = API_URL.replace(/^http/, 'ws');
@@ -48,6 +49,7 @@ export default function GamePage() {
   const [editUsername, setEditUsername] = useState('');
   const [nameSuggestions, setNameSuggestions] = useState<string[]>([]);
   const [showAdModal, setShowAdModal] = useState(false);
+  const hasAdblock = useAdblockDetector();
 
   const handleCloseStore = useCallback(() => setIsStoreOpen(false), []);
   const handleCloseLeaderboard = useCallback(() => setIsLeaderboardOpen(false), []);
@@ -1094,7 +1096,7 @@ export default function GamePage() {
 
         {/* El Huevo Interactivo */}
         <div className="flex flex-col items-center justify-center gap-2 sm:gap-4 my-0 md:my-2 relative flex-1 w-full md:scale-100 origin-top min-h-0">
-          <Egg onEggClick={(isAuto) => handleEggClick(isAuto)} sessionClicks={sessionClicks} cooldownTime={cooldownTime} isFrozen={isFrozen} freezeTimeLeft={freezeTimeLeft} isAutoclicking={isAutoclicking} localMartillo={localMartillo} localHamAss={localHamAss} localTouchMe={localTouchMe} setIsHolding={setIsHolding} inventory={inventory} autoClickTrigger={autoClickTrigger} resetCooldown={(sendToServer) => resetCooldown(sendToServer ? 'force' : undefined)} userId={session?.user?.email || 'anon_user'} showOverheatWarning={showOverheatWarning} isEggBroken={isEggBroken} />
+          <Egg onEggClick={(isAuto) => handleEggClick(isAuto)} sessionClicks={sessionClicks} cooldownTime={cooldownTime} isFrozen={isFrozen} freezeTimeLeft={freezeTimeLeft} isAutoclicking={isAutoclicking} localMartillo={localMartillo} localHamAss={localHamAss} localTouchMe={localTouchMe} setIsHolding={setIsHolding} inventory={inventory} autoClickTrigger={autoClickTrigger} resetCooldown={(sendToServer) => resetCooldown(sendToServer ? 'force' : undefined)} userId={session?.user?.email || 'anon_user'} showOverheatWarning={showOverheatWarning} isEggBroken={isEggBroken} hasAdblock={hasAdblock} />
 
           {/* Indicador de Desconexión sobre el huevo */}
           {!isWsConnected && status === 'authenticated' && !isMultiTabBlocked && (
@@ -1894,6 +1896,28 @@ export default function GamePage() {
 
       <CookieBanner />
       <TutorialModal />
+
+      {/* AdBlock Warning Toast */}
+      <AnimatePresence>
+        {hasAdblock && (
+          <motion.div
+            initial={{ opacity: 0, x: -50 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -50 }}
+            className="fixed bottom-6 left-6 z-[300] max-w-sm bg-red-900/90 border border-red-500 rounded-xl p-4 shadow-[0_0_30px_rgba(239,68,68,0.3)] backdrop-blur-sm"
+          >
+            <div className="flex items-start gap-3">
+              <span className="text-2xl">⛔</span>
+              <div>
+                <h4 className="text-white font-black uppercase text-sm mb-1 tracking-wider">Bloqueador Detectado</h4>
+                <p className="text-red-200 text-xs leading-relaxed">
+                  Para poder jugar debes desactivar tu bloqueador de anuncios. Con los anuncios financiamos los premios reales que entregamos cada temporada.
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Mobile Nav Overlay */}
       {isMobileNavOpen && (

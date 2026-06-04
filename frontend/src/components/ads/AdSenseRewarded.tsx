@@ -11,6 +11,7 @@ export default function AdSenseRewarded({ onRewardEarned }: AdSenseRewardedProps
     
     const showRewardedVideo = async () => {
         setIsPlaying(true);
+        
         try {
             const res = await fetch(`${API_URL}/api/v1/ads/generate-token`);
             const data = await res.json();

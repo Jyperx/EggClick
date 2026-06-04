@@ -21,9 +21,10 @@ interface EggProps {
   userId?: string;
   showOverheatWarning?: boolean;
   isEggBroken?: boolean;
+  hasAdblock?: boolean;
 }
 
-export default function Egg({ onEggClick, sessionClicks = 0, cooldownTime = 0, isFrozen = false, freezeTimeLeft = 0, isAutoclicking = false, localMartillo, localHamAss, localTouchMe, setIsHolding, inventory = {}, autoClickTrigger = 0, resetCooldown, userId = 'anon_user', showOverheatWarning = false, isEggBroken = false }: EggProps) {
+export default function Egg({ onEggClick, sessionClicks = 0, cooldownTime = 0, isFrozen = false, freezeTimeLeft = 0, isAutoclicking = false, localMartillo, localHamAss, localTouchMe, setIsHolding, inventory = {}, autoClickTrigger = 0, resetCooldown, userId = 'anon_user', showOverheatWarning = false, isEggBroken = false, hasAdblock = false }: EggProps) {
   const floatingContainerRef = useRef<HTMLDivElement>(null);
   const eggVisualRef = useRef<HTMLDivElement>(null);
   const [isHoldingLocal, setIsHoldingLocal] = useState(false);
@@ -194,6 +195,7 @@ export default function Egg({ onEggClick, sessionClicks = 0, cooldownTime = 0, i
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (activePointers.current.size >= 2) return;
+    if (hasAdblock) return;
     activePointers.current.add(e.pointerId);
 
     setIsHoldingLocal(true);
