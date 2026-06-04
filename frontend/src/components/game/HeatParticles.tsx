@@ -2,14 +2,16 @@
 
 import { useEffect, useRef } from 'react';
 
-export default function HeatParticles({ sessionClicks, isEggBroken }: { sessionClicks: number, isEggBroken: boolean }) {
+export default function HeatParticles({ sessionClicks, isEggBroken, isOverheated = false }: { sessionClicks: number, isEggBroken: boolean, isOverheated?: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const clicksRef = useRef(sessionClicks);
+  const overheatedRef = useRef(isOverheated);
 
-  // Mantener la referencia de clics actualizada sin re-renderizar
+  // Mantener la referencia actualizada sin re-renderizar
   useEffect(() => {
     clicksRef.current = sessionClicks;
-  }, [sessionClicks]);
+    overheatedRef.current = isOverheated;
+  }, [sessionClicks, isOverheated]);
 
   useEffect(() => {
     if (isEggBroken) return;
@@ -17,9 +19,10 @@ export default function HeatParticles({ sessionClicks, isEggBroken }: { sessionC
     const spawnInterval = setInterval(() => {
       if (typeof document !== 'undefined' && document.hidden) return;
       if (!containerRef.current) return;
+      const container = containerRef.current;
 
       const currentClicks = clicksRef.current;
-      const heatPercentage = ((currentClicks % 200) / 200) * 100;
+      const heatPercentage = overheatedRef.current ? 100 : ((currentClicks % 200) / 200) * 100;
       
       let colorClass = 'bg-pink-500 shadow-[0_0_15px_rgba(236,72,153,1)]';
       let spawnCount = 1;
@@ -37,9 +40,9 @@ export default function HeatParticles({ sessionClicks, isEggBroken }: { sessionC
 
       for (let i = 0; i < spawnCount; i++) {
         // Limitar nodos en el DOM para evitar fugas de memoria
-        if (containerRef.current.childNodes.length > 35) {
-          const firstChild = containerRef.current.firstChild;
-          if (firstChild) containerRef.current.removeChild(firstChild);
+        if (container.childNodes.length > 35) {
+          const firstChild = container.firstChild;
+          if (firstChild) container.removeChild(firstChild);
         }
 
         const size = Math.random() * 4 + 3;
@@ -57,12 +60,12 @@ export default function HeatParticles({ sessionClicks, isEggBroken }: { sessionC
         particle.style.animation = `floatUp ${duration}s linear forwards`;
         
         particle.addEventListener('animationend', () => {
-          if (particle.parentNode === containerRef.current) {
-            containerRef.current.removeChild(particle);
+          if (particle.parentNode === container) {
+            container.removeChild(particle);
           }
         });
 
-        containerRef.current.appendChild(particle);
+        container.appendChild(particle);
       }
     }, 400);
 

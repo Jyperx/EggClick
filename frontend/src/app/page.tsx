@@ -38,6 +38,7 @@ export default function GamePage() {
   const [isDailySpinOpen, setIsDailySpinOpen] = useState(false);
   const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
   const [isClanOpen, setIsClanOpen] = useState(false);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [userClanId, setUserClanId] = useState<number | null>(null);
   const [userClanName, setUserClanName] = useState<string | null>(null);
   const [userClanShieldId, setUserClanShieldId] = useState<number>(1);
@@ -641,7 +642,16 @@ export default function GamePage() {
     <DailySpinModal
       isOpen={isDailySpinOpen}
       onClose={() => setIsDailySpinOpen(false)}
-      onSpinResult={(prize) => {}}
+      onSpinResult={(prize) => {
+        if (typeof prize === 'number' && prize > 0) {
+          setEggCoins(prev => prev + prize);
+          setCoinPopups(prev => [...prev, { id: Date.now(), val: prize }]);
+          setTimeout(() => {
+            setCoinPopups(prev => prev.slice(1));
+          }, 1500);
+        }
+        reloadUser();
+      }}
       userId={session?.user?.email || ''}
       token={cachedToken.current || ''}
       forceRefresh={reloadUser}
@@ -689,7 +699,7 @@ export default function GamePage() {
       <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-slate-950 pointer-events-none" />
       
       {/* Partículas de calor ascendentes basadas en los clics */}
-      <HeatParticles sessionClicks={sessionClicks} isEggBroken={isEggBroken} />
+      <HeatParticles sessionClicks={sessionClicks} isEggBroken={isEggBroken} isOverheated={cooldownTime > 0} />
 
       {/* Botón de Clan (Esquina Superior Izquierda) - Oculto en Móvil */}
       <div className="absolute top-6 left-8 z-50 hidden md:flex items-center gap-3 origin-top-left">
@@ -814,7 +824,7 @@ export default function GamePage() {
 
                 {/* Tu Billetera */}
                 <div className="flex flex-col items-center">
-                  <div className="text-[10px] font-black text-slate-400 tracking-[0.2em] uppercase mb-1 whitespace-nowrap">TU BILLETERA</div>
+                  <div className="hidden md:block text-[10px] font-black text-slate-400 tracking-[0.2em] uppercase mb-1 whitespace-nowrap">TU BILLETERA</div>
                   <div className="relative flex items-center justify-center">
                     <AnimatePresence>
                       {coinPopups.map(popup => (
@@ -1587,8 +1597,20 @@ export default function GamePage() {
       <TutorialModal />
 
       {/* Navigation Sidebar (Mobile) */}
-      <div className="md:hidden fixed left-2 top-1/2 -translate-y-1/2 z-40 flex flex-col items-center gap-3 bg-slate-900/80 backdrop-blur-xl border border-white/10 p-2 rounded-full shadow-[0_0_20px_rgba(0,0,0,0.5)]">
-        {/* Clan */}
+      <div className={`md:hidden fixed left-0 top-1/2 -translate-y-1/2 z-40 transition-transform duration-300 flex flex-row-reverse items-center ${isMobileNavOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        
+        {/* Pestaña para abrir/cerrar */}
+        <button 
+          onClick={() => setIsMobileNavOpen(!isMobileNavOpen)}
+          className="absolute -right-8 top-1/2 -translate-y-1/2 bg-slate-900/90 backdrop-blur-xl border border-white/10 border-l-0 rounded-r-xl p-2 py-4 flex flex-col items-center justify-center gap-2 shadow-[5px_0_15px_rgba(0,0,0,0.5)]"
+        >
+          {isMobileNavOpen ? <ChevronLeft size={16} className="text-white"/> : <ChevronRight size={16} className="text-white"/>}
+          <span className="text-[10px] uppercase font-black tracking-widest text-slate-300" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>Menú</span>
+        </button>
+
+        {/* Contenido del menú */}
+        <div className="flex flex-col items-center gap-3 bg-slate-900/90 backdrop-blur-xl border border-white/10 p-2 py-4 rounded-r-2xl shadow-[0_0_20px_rgba(0,0,0,0.5)] ml-0 w-16">
+          {/* Clan */}
         <button onClick={() => setIsClanOpen(true)} className="flex flex-col items-center gap-1 active:scale-95 transition-transform relative p-1">
           <div className="relative">
             {userClanName ? (
@@ -1636,6 +1658,7 @@ export default function GamePage() {
             </button>
           </>
         )}
+        </div>
       </div>
 
       {/* Footer para enlaces legales de AdSense */}

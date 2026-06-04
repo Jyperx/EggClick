@@ -29,8 +29,9 @@ export default function Egg({ onEggClick, sessionClicks = 0, cooldownTime = 0, i
   const [isHoldingLocal, setIsHoldingLocal] = useState(false);
   const [isIdle, setIsIdle] = useState(true);
   const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const audioPool = useRef<HTMLAudioElement[]>([]);
-  const poolIndex = useRef(0);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const audioBufferRef = useRef<AudioBuffer | null>(null);
+  const activePointers = useRef<Set<number>>(new Set());
 
   const resetIdleTimer = () => {
     setIsIdle(false);
@@ -46,24 +47,41 @@ export default function Egg({ onEggClick, sessionClicks = 0, cooldownTime = 0, i
   }, []);
 
   useEffect(() => {
-    // Pre-allocate an audio pool to prevent massive memory leaks and lag from cloning
     if (typeof window !== 'undefined') {
-      const pool: HTMLAudioElement[] = [];
-      for (let i = 0; i < 5; i++) {
-        const audio = new Audio('/sounds/huevo.mp3');
-        audio.volume = 0.5;
-        pool.push(audio);
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioContextClass) {
+        const ctx = new AudioContextClass();
+        audioContextRef.current = ctx;
+        fetch('/sounds/huevo.mp3')
+          .then(res => res.arrayBuffer())
+          .then(buffer => ctx.decodeAudioData(buffer))
+          .then(decoded => {
+            audioBufferRef.current = decoded;
+          })
+          .catch(e => console.error("Error loading audio:", e));
       }
-      audioPool.current = pool;
     }
   }, []);
 
   const playClickSound = () => {
-    if (audioPool.current.length === 0) return;
-    const audio = audioPool.current[poolIndex.current];
-    audio.currentTime = 0;
-    audio.play().catch(() => { });
-    poolIndex.current = (poolIndex.current + 1) % audioPool.current.length;
+    if (!audioContextRef.current || !audioBufferRef.current) return;
+    const ctx = audioContextRef.current;
+    
+    // Unlock audio context on mobile
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
+    
+    const source = ctx.createBufferSource();
+    source.buffer = audioBufferRef.current;
+    
+    const gainNode = ctx.createGain();
+    gainNode.gain.value = 0.5; // Volúmen al 50%
+    
+    source.connect(gainNode);
+    gainNode.connect(ctx.destination);
+    
+    source.start(0);
   };
   const isOverheated = cooldownTime > 0;
   const martilloUses = localMartillo !== undefined ? localMartillo : (inventory.martillo_uses || 0);
@@ -71,10 +89,11 @@ export default function Egg({ onEggClick, sessionClicks = 0, cooldownTime = 0, i
   const touchMeSecs = localTouchMe !== undefined ? localTouchMe : (inventory.touchme_seconds || 0);
 
   const spawnCrack = (x: number, y: number) => {
-    if (!floatingContainerRef.current) return;
-    if (floatingContainerRef.current.querySelectorAll('.crack-element').length > 5) {
-      const first = floatingContainerRef.current.querySelector('.crack-element');
-      if (first) floatingContainerRef.current.removeChild(first);
+    const container = floatingContainerRef.current;
+    if (!container) return;
+    if (container.querySelectorAll('.crack-element').length > 5) {
+      const first = container.querySelector('.crack-element');
+      if (first) container.removeChild(first);
     }
     const el = document.createElement('div');
     el.className = 'absolute z-20 pointer-events-none text-white text-4xl crack-element';
@@ -83,16 +102,17 @@ export default function Egg({ onEggClick, sessionClicks = 0, cooldownTime = 0, i
     el.textContent = '💥';
     el.style.animation = 'crackFade 0.5s ease-out forwards';
     el.addEventListener('animationend', () => {
-      if (el.parentNode === floatingContainerRef.current) floatingContainerRef.current.removeChild(el);
+      if (el.parentNode === container) container.removeChild(el);
     });
-    floatingContainerRef.current.appendChild(el);
+    container.appendChild(el);
   };
 
   const spawnFloatingText = (x: number, y: number, text: string, type: string) => {
-    if (!floatingContainerRef.current) return;
-    if (floatingContainerRef.current.querySelectorAll('.floating-text').length > 25) {
-      const first = floatingContainerRef.current.querySelector('.floating-text');
-      if (first) floatingContainerRef.current.removeChild(first);
+    const container = floatingContainerRef.current;
+    if (!container) return;
+    if (container.querySelectorAll('.floating-text').length > 25) {
+      const first = container.querySelector('.floating-text');
+      if (first) container.removeChild(first);
     }
 
     const el = document.createElement('div');
@@ -115,10 +135,10 @@ export default function Egg({ onEggClick, sessionClicks = 0, cooldownTime = 0, i
     el.style.animation = `${animationClass} ${type === 'hamass' ? '1s' : '0.8s'} ease-out forwards`;
 
     el.addEventListener('animationend', () => {
-      if (el.parentNode === floatingContainerRef.current) floatingContainerRef.current.removeChild(el);
+      if (el.parentNode === container) container.removeChild(el);
     });
 
-    floatingContainerRef.current.appendChild(el);
+    container.appendChild(el);
   };
 
   const triggerWobble = () => {
@@ -172,23 +192,18 @@ export default function Egg({ onEggClick, sessionClicks = 0, cooldownTime = 0, i
     }
   }, [isHoldingLocal, touchMeSecs, isOverheated, isEggBroken]);
 
-  const handlePointerDown = () => {
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (activePointers.current.size >= 2) return;
+    activePointers.current.add(e.pointerId);
+
     setIsHoldingLocal(true);
     if (setIsHolding) setIsHolding(true);
-  };
 
-  const handlePointerUp = () => {
-    setIsHoldingLocal(false);
-    if (setIsHolding) setIsHolding(false);
-  };
-
-  const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     onEggClick();
     if (isOverheated) return;
 
     playClickSound();
     resetIdleTimer();
-    // Wobble is naturally handled by framer motion whileTap, no need for DOM manipulation here
 
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -201,6 +216,14 @@ export default function Egg({ onEggClick, sessionClicks = 0, cooldownTime = 0, i
     const powerText = hamassUses > 0 ? "+100" : martilloUses > 0 ? "+5" : "+1";
     const type = hamassUses > 0 ? "hamass" : martilloUses > 0 ? "martillo" : "normal";
     spawnFloatingText(x, y, powerText, type);
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    activePointers.current.delete(e.pointerId);
+    if (activePointers.current.size === 0) {
+      setIsHoldingLocal(false);
+      if (setIsHolding) setIsHolding(false);
+    }
   };
 
   // Porcentaje de calor dinámico por fase (ciclos de 200)
@@ -252,7 +275,7 @@ export default function Egg({ onEggClick, sessionClicks = 0, cooldownTime = 0, i
       )}
 
       <div
-        className={`absolute w-[250px] h-[300px] rounded-full blur-[80px] pointer-events-none transition-transform duration-300 will-change-transform ${isPhase3Wall ? 'opacity-40' : ''}`}
+        className="absolute w-[250px] h-[300px] rounded-full blur-[80px] pointer-events-none transition-transform duration-300 will-change-transform"
         style={{
           backgroundColor: isFrozen ? 'rgba(6, 182, 212, 0.8)' : isOverheated ? 'rgba(220, 38, 38, 0.9)' : `rgba(${rgbColor}, ${glowOpacity})`,
           transform: `translateZ(0) scale(${isOverheated ? 1.2 : glowScale})`,
@@ -320,7 +343,6 @@ export default function Egg({ onEggClick, sessionClicks = 0, cooldownTime = 0, i
             ? { x: [-5, 5, -5, 5, 0], transition: { repeat: Infinity, duration: 0.4 } }
             : {}
         }
-        onClick={handleClick}
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerUp}
